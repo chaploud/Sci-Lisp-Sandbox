@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::fmt::Display;
 
 use crate::rust::types::any::Any;
+use crate::rust::types::evaluable::Evaluable;
 
 pub struct Symbol {
     pub name: String,
@@ -20,3 +21,4 @@ impl Display for Symbol {
 }
 
 impl Any for Symbol {}
+impl Evaluable for Symbol {}

@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::rust::types::any::Any;
 use crate::rust::types::collection::Collection;
+use crate::rust::types::evaluable::Evaluable;
 use crate::rust::types::iterable::Iterable;
 
 pub struct List {
@@ -45,3 +46,5 @@ impl Any for List {}
 impl Iterable for List {}
 
 impl Collection for List {}
+
+impl Evaluable for List {}

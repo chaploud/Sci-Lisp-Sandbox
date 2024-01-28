@@ -66,3 +66,31 @@
 ;; 型も入ってくるとさらにわけがわからん
 ;; デフォルト値はletで指定することにする
 ;; typedef 気軽に型定義する
+
+;; まず設計ができなければ書くことはできない!
+;; よく考えよう
+
+;; enum
+(enum Color
+  [Red Green Blue])
+
+(def c #Color Color.Red)
+
+(switch c
+  [Color.Red] (print "red")
+  [Color.Green] (print "green")
+  [Color.Blue] (print "blue"))
+
+;; struct
+(struct Point
+  [x #i64 y #i64
+   move #fn[i64, i64][Point]])
+
+(def p #Point (Point {:x 1, :y 2}))
+;; or
+(def p #Point (Point 1 2))
+;; mixできるが、キーワード指定したほうが勝つ
+;; 不足している場合はnilが入る
+
+(print p.x p.y)  ;; このスタイルを許可する
+(print (.x p) (.y p)) ;; こういうこともできる
