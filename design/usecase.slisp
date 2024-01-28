@@ -36,7 +36,7 @@
       :nano nano #i64, :tz tz #str,
       :default {:year 1970, :mon 1, :day 1, :hour 0,
                 :min 0, :sec 0, :nano 0, :tz "UTC+00:00"}}]
-  #datetime ;; 返り値の型アノテーション
+  => #datetime ;; 返り値の型アノテーション
 
   ;; デフォルト値を指定したものは、型推論ができる(あんまり意味はないか)
   ;; Mapはキーとペアのセットだが、型情報はシンタックス的に許容する
@@ -70,6 +70,16 @@
 ;; まず設計ができなければ書くことはできない!
 ;; よく考えよう
 
+;; 多重ディスパッチ
+
+(defn some [x #i64] => #i64
+  (print "i64")
+  x)
+
+(defn some [x #f64] => #f64
+  (print "f64")
+  x)
+
 ;; enum
 (enum Color
   [Red Green Blue])
@@ -81,10 +91,24 @@
   [Color.Green] (print "green")
   [Color.Blue] (print "blue"))
 
+;; すごいシンプルな考え方だと、'Color.Red, Color.Green, Color.Blue'というシンボルが環境に挿入される
+;; Colorという型も環境に挿入される
+;; ColorというシンボルにひもづいてRed, Green, Blueというシンボルが挿入される
+;; シンボルテーブル(これはwasmで解決してくれる)
+;; docテーブル(自前で用意、高速Lookup必要なし)
+;; タイプテーブル(シンボル+何型か)
+;; の3つを用意する
+;; REPL駆動をイメージするとやりやすいな
+
+;; Color.Purpleというのをdefできてしまうのはよくない
+(def c #Color Color.Purple)
+
+;; enumオブジェクトが要るなぁ
+
 ;; struct
 (struct Point
   [x #i64 y #i64
-   move #fn[i64, i64][Point]])
+   move #fn[#i64, #i64 => #Point]])
 
 (def p #Point (Point {:x 1, :y 2}))
 ;; or
