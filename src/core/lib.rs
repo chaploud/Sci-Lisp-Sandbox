@@ -1,3 +1,5 @@
+mod rust;
+
 #[no_mangle]
 pub extern "C" fn loop_ten_million_times() -> i32 {
     let mut i = 0;

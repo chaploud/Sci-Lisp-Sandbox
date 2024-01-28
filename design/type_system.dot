@@ -1,0 +1,42 @@
+// $ dot -Tpng -o sci_lisp_type_system.png sci_lisp_type_system.dot
+digraph sci_lisp_type_system {
+  graph [layout = dot; rankdir = BT;];
+  
+  node [fontsize = 12; shape = box; style = "rounded";];
+  
+  Nil -> Any;
+  Bool -> Any;
+  Regex -> Any;
+  Datetime -> Any;
+  TimeDelta -> Any;
+  Number -> Any;
+  Struct -> Any;
+  Enum -> Any;
+  Union -> Any;
+  
+  I64 -> Number;
+  F64 -> Number;
+  C64 -> Number;
+  I64 -> Callable;
+  Callable -> Any;
+  
+  Keyword -> Callable;
+  Slice -> Callable;
+  Function -> Callable;
+  Macro -> Callable;
+  String -> Callable;
+  
+  List -> Evaluable;
+  Symbol -> Evaluable;
+  Evaluable -> Any;
+  
+  Collection -> Iterable;
+  Generator -> Iterable;
+  String -> Iterable;
+  Iterable -> Any;
+  
+  Vector -> Collection;
+  Map -> Collection;
+  Set -> Collection;
+  List -> Collection;
+}
