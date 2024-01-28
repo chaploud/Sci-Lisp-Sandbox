@@ -8,11 +8,6 @@ pub extern "C" fn loop_ten_million_times() -> i32 {
     }
     i
 }
-// extern crate rand;
 
-// use rand::random;
-
-// #[no_mangle]
-// pub extern "C" fn random_wrapper() -> f64 {
-//     random::<f64>()
-// }
+#[no_mangle]
+pub extern "C" fn print_types() {}
