@@ -34,13 +34,13 @@
    & {:year year #i64, :mon mon #i64, :day day #i64,
       :hour hour #i64, :min min #i64, :sec sec #i64,
       :nano nano #i64, :tz tz #str,
-      :default {:year 1970, :mon 1, :day 1, :hour 0,
-                :min 0, :sec 0, :nano 0, :tz "UTC+00:00"}}]
+      :default {year 1970, mon 1, day 1, hour 0,
+                min 0, sec 0, nano 0, tz "UTC+00:00"}}]
   => #datetime ;; 返り値の型アノテーション
-
   ;; デフォルト値を指定したものは、型推論ができる(あんまり意味はないか)
   ;; Mapはキーとペアのセットだが、型情報はシンタックス的に許容する
   ;; 型アノテーションは指定しなくてもいい(型推論できないものは、Any型になる)
+  ;; defaultは位置引数や可変長引数も指定できることに気づいた
 
   ;; シンボルにどちらも指定されていた場合は後勝ち
 
