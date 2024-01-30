@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::hash::Hash;
@@ -36,7 +37,7 @@ impl PartialEq for Symbol {
 impl Eq for Symbol {}
 
 impl Any for Symbol {
-    fn type_name(&self) -> &'static str {
-        "symbol"
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<Symbol>()
     }
 }

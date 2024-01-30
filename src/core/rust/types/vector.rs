@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::sync::Arc;
@@ -42,8 +43,8 @@ impl Display for Vector {
 }
 
 impl Any for Vector {
-    fn type_name(&self) -> &'static str {
-        "vector"
+    fn type_id(&self) -> std::any::TypeId {
+        TypeId::of::<Vector>()
     }
 }
 

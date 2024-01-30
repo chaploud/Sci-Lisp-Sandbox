@@ -1,4 +1,4 @@
-// $ dot -Tpng -o ype_system.png type_system.dot
+// $ dot -Tpng -o type_system.png type_system.dot
 digraph sci_lisp_type_system {
   graph [layout = dot; rankdir = BT;];
   
@@ -27,4 +27,6 @@ digraph sci_lisp_type_system {
   Map -> Collection;
   Set -> Collection;
   List -> Collection;
+  
+  Slice -> Struct;
 }
