@@ -49,7 +49,7 @@ inf                 ; positive infinity
 ([0|2] a)                    ; slice => "ab"
 (-1 C)                       ; back => 3
 
-;; NOTE: Only let can make scope in Sci-Lisp
+;; NOTE: Only let and fn(clousure/lambda) can make scope in Sci-Lisp
 (let [a 2]                   ; bind variable (make scope)
   (set! a 3)                 ; assign(destructive)
   a)                         ; => 3
