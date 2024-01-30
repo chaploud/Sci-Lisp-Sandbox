@@ -436,7 +436,7 @@ i                            ; => 4 you can access i after loop.
 ;; #str is sub type of #iterable
 ;; #generator is sub type of #iterable
 ;; #slice is defined with #struct
-;; #map-key is #str, #i64, #key
+;; #map-key can take #str, #i64, #key
 
 ;; ===== multiple dispatch
 ;; You can define multiple function with same name with different type.
@@ -448,7 +448,7 @@ i                            ; => 4 you can access i after loop.
   (print "f64")
   x)
 
-(some 1)                            ; 1 => "i64"
+(some 1)                              ; 1 => "i64"
 
 ;; def, const, fn, struct, enum, macro, union, typedef
 
