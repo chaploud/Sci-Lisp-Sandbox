@@ -23,4 +23,8 @@ impl Display for MapKey {
     }
 }
 
-impl Any for MapKey {}
+impl Any for MapKey {
+    fn type_name(&self) -> &'static str {
+        "map-key"
+    }
+}

@@ -12,6 +12,17 @@ use crate::rust::types::collection::Collection;
 use crate::rust::types::iterable::Iterable;
 use crate::rust::types::number::Number;
 
-impl Any for Array<Arc<dyn Number>, IxDyn> {}
+impl Any for Array<Arc<dyn Number>, IxDyn> {
+    fn type_name(&self) -> &'static str {
+        "array"
+    }
+}
 impl Iterable for Array<Arc<dyn Number>, IxDyn> {}
-impl Collection for Array<Arc<dyn Number>, IxDyn> {}
+impl Collection for Array<Arc<dyn Number>, IxDyn> {
+    fn len(&self) -> usize {
+        self.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}

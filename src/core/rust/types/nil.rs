@@ -16,4 +16,8 @@ impl Display for Nil {
     }
 }
 
-impl Any for Nil {}
+impl Any for Nil {
+    fn type_name(&self) -> &'static str {
+        "nil"
+    }
+}

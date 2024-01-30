@@ -36,5 +36,9 @@ impl PartialEq for Symbol {
 
 impl Eq for Symbol {}
 
-impl Any for Symbol {}
+impl Any for Symbol {
+    fn type_name(&self) -> &'static str {
+        "symbol"
+    }
+}
 impl Evaluable for Symbol {}

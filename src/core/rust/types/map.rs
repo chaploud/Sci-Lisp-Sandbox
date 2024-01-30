@@ -41,8 +41,19 @@ impl Display for Map {
     }
 }
 
-impl Any for Map {}
+impl Any for Map {
+    fn type_name(&self) -> &'static str {
+        "map"
+    }
+}
 
 impl Iterable for Map {}
 
-impl Collection for Map {}
+impl Collection for Map {
+    fn len(&self) -> usize {
+        self.value.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.value.is_empty()
+    }
+}

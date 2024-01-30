@@ -41,8 +41,19 @@ impl Display for Vector {
     }
 }
 
-impl Any for Vector {}
+impl Any for Vector {
+    fn type_name(&self) -> &'static str {
+        "vector"
+    }
+}
 
 impl Iterable for Vector {}
 
-impl Collection for Vector {}
+impl Collection for Vector {
+    fn len(&self) -> usize {
+        self.value.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.value.is_empty()
+    }
+}

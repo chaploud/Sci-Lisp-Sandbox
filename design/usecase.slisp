@@ -107,7 +107,8 @@
 
 ;; struct
 (struct Point
-  [x #i64 y #i64
+  [x #i64
+   y #i64
    move #fn[#i64, #i64 => #Point]])
 
 (def p #Point (Point {:x 1, :y 2}))

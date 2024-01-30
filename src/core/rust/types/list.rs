@@ -41,10 +41,18 @@ impl Display for List {
     }
 }
 
-impl Any for List {}
+impl Any for List {
+    fn type_name(&self) -> &'static str {
+        "list"
+    }
+}
 
 impl Iterable for List {}
 
-impl Collection for List {}
+impl Collection for List {
+    fn len(&self) -> usize {
+        self.value.len()
+    }
+}
 
 impl Evaluable for List {}

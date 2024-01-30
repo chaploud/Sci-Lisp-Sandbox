@@ -35,7 +35,11 @@ impl Display for Enum {
     }
 }
 
-impl Any for Enum {}
+impl Any for Enum {
+    fn type_name(&self) -> &'static str {
+        "enum"
+    }
+}
 
 impl Enum {
     #[allow(dead_code)]

@@ -21,4 +21,8 @@ impl Display for Slice {
     }
 }
 
-impl Any for Slice {}
+impl Any for Slice {
+    fn type_name(&self) -> &'static str {
+        "slice"
+    }
+}

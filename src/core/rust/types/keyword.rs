@@ -19,4 +19,8 @@ impl Display for Keyword {
     }
 }
 
-impl Any for Keyword {}
+impl Any for Keyword {
+    fn type_name(&self) -> &'static str {
+        "keyword"
+    }
+}
