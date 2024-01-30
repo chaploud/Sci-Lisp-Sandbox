@@ -1,6 +1,7 @@
+use crate::rust::types::any::Any;
 use crate::rust::types::iterable::Iterable;
 
-pub trait Collection: Iterable {
+pub trait Collection: Iterable + Any {
     fn type_name(&self) -> &'static str {
         "collection"
     }

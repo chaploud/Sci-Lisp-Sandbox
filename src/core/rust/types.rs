@@ -5,7 +5,6 @@ pub mod c64;
 pub mod collection;
 pub mod datetime;
 pub mod r#enum;
-pub mod evaluable;
 pub mod f64;
 pub mod function;
 pub mod generator;

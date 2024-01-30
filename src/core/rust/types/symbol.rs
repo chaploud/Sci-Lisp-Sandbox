@@ -3,7 +3,6 @@ use std::fmt::Display;
 use std::hash::Hash;
 
 use crate::rust::types::any::Any;
-use crate::rust::types::evaluable::Evaluable;
 
 #[derive(Clone)]
 pub struct Symbol {
@@ -41,4 +40,3 @@ impl Any for Symbol {
         "symbol"
     }
 }
-impl Evaluable for Symbol {}

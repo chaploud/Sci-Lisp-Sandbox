@@ -401,7 +401,7 @@ i                            ; => 4 you can access i after loop.
 #sym                     ; symbol
 #l[#any]                 ; list of any
 #v[#i64]                 ; vector of i64
-#m[#key, #str]           ; map of keyword and string
+#m[#str]                 ; map that value is string
 #s[#f64]                 ; set of f64
 #a[#i64, [2, 3, 4]]      ; 3d-array of i64 (shape is [2, 3, 4])
 #gen                     ; generator
@@ -431,6 +431,7 @@ i                            ; => 4 you can access i after loop.
 ;; #collection is sub type of #iterable
 ;; #str is sub type of #iterable
 ;; #gen is sub type of #iterable
+;; map-key is #str, #i64, #key
 
 ;; ===== multiple dispatch
 ;; You can define multiple function with same name with different type.
