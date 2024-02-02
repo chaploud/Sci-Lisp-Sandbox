@@ -489,7 +489,7 @@ i                            ; => 4 you can access i after loop.
 ([|, 1|2] a)                          ; => [[[2], [5]], [[3], [6]]]
 
 ;; Polars binding
-;; Parallel
+;; Parallel(thread, coroutine, async)
 ;; SIMD
 ;; JIT
 ;; ******************************************

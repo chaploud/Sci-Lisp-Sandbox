@@ -31,4 +31,4 @@ https://github.com/dinfuehr/dora
 
 - 16万行
 - 命令セットにいたるまですべて自前で実装している感じ
-- bytecode
+- bytecodeをwasmにすればいいと思う
