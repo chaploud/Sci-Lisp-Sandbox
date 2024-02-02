@@ -63,15 +63,12 @@ x                            ; => error
 (defn my-sum                 ; define function
   "sum two value"            ; docstring
   [a b]
-  (print a b)
-  (+ a b))
-
-(def my-sum                  ; bind function using def
-  (fn [a b]                  ; anonymous/lambda function
-    (return (+ a b))         ; can use early return
-    (- a b)))
+  (return (+ a b))           ; can use early return
+  (- a b))
 
 (my-sum 1 2)                 ; => 3
+
+((fn [x] (* x x)) 2)         ; => 4 (lambda/anonymus function)
 
 ;; ===== Control Flow
 (if (< 2 3)                  ; if
@@ -306,9 +303,12 @@ i                            ; => 4 you can access i after loop.
 ;; ===== struct
 (struct Enemy                       ; define struct
   "Enemy Struct"                    ; docstring
-  [hp])
+  [hp]
+  :method
+  (defn heal [self x]               ; define method inside of struct
+    (set! self.hp (+ self.hp x))))
 
-(method [Enemy]                     ; define method
+(method [Enemy]                     ; define method outside of struct
   (defn damage [self x]             ; TODO: Constructor
     (set! self.hp (- self.hp x))))
 

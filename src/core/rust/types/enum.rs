@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::fmt::Debug;
 use std::fmt::Display;
 
@@ -6,6 +7,8 @@ use indexmap::IndexSet;
 use crate::rust::types::any::Any;
 use crate::rust::types::symbol::Symbol;
 
+// TODO:
+
 #[derive(Debug)]
 pub struct Enum {
     pub name: Symbol,
@@ -13,7 +16,6 @@ pub struct Enum {
 }
 
 impl Enum {
-    #[allow(dead_code)]
     pub fn new(name: Symbol, member: Vec<Symbol>) -> Self {
         let member: IndexSet<Symbol> = member.into_iter().collect();
         Self { name, member }
@@ -36,8 +38,8 @@ impl Display for Enum {
 }
 
 impl Any for Enum {
-    fn type_name(&self) -> &'static str {
-        "enum"
+    fn type_id(&self) -> TypeId {
+        TypeId::of::<Enum>()
     }
 }
 
