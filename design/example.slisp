@@ -491,6 +491,10 @@ i                            ; => 4 you can access i after loop.
 ([|, 1] a)                            ; => [[2, 5], [3, 6]]
 ([|, 1|2] a)                          ; => [[[2], [5]], [[3], [6]]]
 
+;; ===== Scientific Constants
+
+
+
 ;; Polars binding
 ;; Parallel(thread, coroutine, async)
 ;; SIMD

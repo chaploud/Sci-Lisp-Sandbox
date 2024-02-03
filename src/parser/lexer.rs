@@ -57,15 +57,15 @@ impl<'a> Lexer<'a> {
 
         if is_whitespace(ch) {
             self.read_white_space()
-        } else if is_digit_or_minus(ch) {
-            self.read_number(false)
-        } else if self.is_line_comment() {
+        } else if is_semicolon(ch) {
             self.read_line_comment()
+        } else if is_digit_or_minus(ch) {
+            self.read_number(false, self.offset())
         } else if is_sharp(ch) {
-            self.read_start_with_sharp()
+            self.read_sharps()
         } else if is_symbol_start(ch) {
             self.read_symbol()
-        } else if is_keyword_start(ch) {
+        } else if is_colon(ch) {
             self.read_keyword()
         } else if is_double_quote(ch) {
             self.read_string()
@@ -99,7 +99,7 @@ impl<'a> Lexer<'a> {
         LineComment
     }
 
-    fn read_start_with_sharp(&mut self) -> TokenKind {
+    fn read_sharps(&mut self) -> TokenKind {
         let start = self.offset();
         let ch = self.curr().expect("missing char");
         self.eat_char();
@@ -131,8 +131,8 @@ impl<'a> Lexer<'a> {
 
         let lookup = self.keywords.get(&value[..]).cloned();
 
-        if let Some(tok_type) = lookup {
-            tok_type
+        if let Some(token_type) = lookup {
+            token_type
         } else if value == "_" {
             Underscore
         } else {
@@ -242,18 +242,15 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_number(&mut self, second_time: bool) -> TokenKind {
-        let minus = if self.curr() == Some('-') {
+    fn read_number(&mut self, second_time: bool, start: u32) -> TokenKind {
+        if self.curr() == Some('-') {
             let next = self.lookahead();
             if is_digit(next) {
                 self.eat_char();
-                true
-            } else {
+            } else if is_symbol_start(next) | is_whitespace(next) | is_close(next) {
                 return self.read_symbol();
             }
-        } else {
-            false
-        };
+        }
 
         let mut base = if self.curr() == Some('0') {
             let next = self.lookahead();
@@ -288,32 +285,37 @@ impl<'a> Lexer<'a> {
 
         self.read_digits(base);
 
+        // example: 12j
         if base == 10 && self.curr() == Some('j') {
             self.eat_char();
             return C64Literal;
         }
 
-        if base == 10 && self.curr() == Some('.') && is_digit(self.lookahead()) {
-            return self.read_number_as_float(second_time);
+        // example: 12., 12.3, 12e3,...
+        if base == 10
+            && (self.curr() == Some('.') || self.curr() == Some('e') || self.curr() == Some('E'))
+        {
+            return self.read_number_as_float(second_time, start);
         }
 
-        if base == 10
+        // example: 12+3j, 12-3.0j, 12+3.2e+01j...
+        if !second_time
+            && base == 10
             && (self.curr() == Some('+') || self.curr() == Some('-'))
             && is_digit(self.lookahead())
         {
-            return self.read_number_as_complex(second_time);
+            return self.read_number_as_complex(start);
         }
 
-        if second_time {
-            let span = self.span_from(self.offset());
+        if !is_whitespace(self.curr()) || !is_close(self.curr()) || !self.is_eof() {
+            let span = self.span_from(start);
             self.report_error_at(ParseError::InvalidNumber, span);
-            return I64Literal;
         }
 
         I64Literal
     }
 
-    fn read_number_as_float(&mut self, second_time: bool) -> TokenKind {
+    fn read_number_as_float(&mut self, second_time: bool, start: u32) -> TokenKind {
         self.eat_char();
 
         self.read_digits(10);
@@ -328,32 +330,28 @@ impl<'a> Lexer<'a> {
             self.read_digits(10);
         }
 
-        if second_time && self.curr() != Some('j') {
-            let span = self.span_from(self.offset());
-            self.report_error_at(ParseError::InvalidNumber, span);
-            return F64Literal;
-        }
-
-        if self.curr() == Some('j') || self.curr() == Some('+') || self.curr() == Some('-') {
-            return self.read_number_as_complex(second_time);
-        }
-
-        F64Literal
-    }
-
-    fn read_number_as_complex(&mut self, second_time: bool) -> TokenKind {
+        // example: 12.3j, 12.j, 12.3-e+1j,...
         if self.curr() == Some('j') {
             self.eat_char();
             return C64Literal;
         }
 
-        if !second_time {
-            self.eat_char();
-            self.read_number(true);
-            return C64Literal;
+        // example: 12.+3j, 12.3-3.2j, 12.3e-3+3.2j,...
+        if !second_time && (self.curr() == Some('+') || self.curr() == Some('-')) {
+            return self.read_number_as_complex(start);
         }
 
-        C64Literal
+        if !is_whitespace(self.curr()) || !is_close(self.curr()) || !self.is_eof() {
+            let span = self.span_from(start);
+            self.report_error_at(ParseError::InvalidNumber, span);
+        }
+
+        F64Literal
+    }
+
+    fn read_number_as_complex(&mut self, start: u32) -> TokenKind {
+        self.eat_char(); // consume '+' or '-'
+        self.read_number(true, start)
     }
 
     fn span_from(&self, start: u32) -> Span {
@@ -430,14 +428,6 @@ fn is_whitespace(ch: Option<char>) -> bool {
         .unwrap_or(false)
 }
 
-fn is_newline(ch: Option<char>) -> bool {
-    ch == Some('\n')
-}
-
-fn is_double_quote(ch: Option<char>) -> bool {
-    ch == Some('\"')
-}
-
 fn is_symbol_start(ch: Option<char>) -> bool {
     match ch {
         Some(ch) => {
@@ -447,12 +437,28 @@ fn is_symbol_start(ch: Option<char>) -> bool {
     }
 }
 
-fn is_keyword_start(ch: Option<char>) -> bool {
-    ch == Some(':')
-}
-
 fn is_symbol(ch: Option<char>) -> bool {
     is_symbol_start(ch) || is_digit(ch)
+}
+
+fn is_quote(ch: Option<char>) -> bool {
+    ch == Some('\'')
+}
+
+fn is_double_quote(ch: Option<char>) -> bool {
+    ch == Some('\"')
+}
+
+fn is_newline(ch: Option<char>) -> bool {
+    ch == Some('\n')
+}
+
+fn is_semicolon(ch: Option<char>) -> bool {
+    ch == Some(';')
+}
+
+fn is_colon(ch: Option<char>) -> bool {
+    ch == Some(':')
 }
 
 fn is_sharp(ch: Option<char>) -> bool {
@@ -471,8 +477,8 @@ fn is_slash(ch: Option<char>) -> bool {
     ch == Some('/')
 }
 
-fn is_quote(ch: Option<char>) -> bool {
-    ch == Some('\'')
+fn is_and(ch: Option<char>) -> bool {
+    ch == Some('&')
 }
 
 fn is_syntax_quote(ch: Option<char>) -> bool {
@@ -485,6 +491,34 @@ fn is_unquote(ch: Option<char>) -> bool {
 
 fn is_splicing(ch: Option<char>) -> bool {
     ch == Some('@')
+}
+
+fn is_open_paren(ch: Option<char>) -> bool {
+    ch == Some('(')
+}
+
+fn is_close_paren(ch: Option<char>) -> bool {
+    ch == Some(')')
+}
+
+fn is_open_bracket(ch: Option<char>) -> bool {
+    ch == Some('[')
+}
+
+fn is_close_bracket(ch: Option<char>) -> bool {
+    ch == Some(']')
+}
+
+fn is_open_brace(ch: Option<char>) -> bool {
+    ch == Some('{')
+}
+
+fn is_close_brace(ch: Option<char>) -> bool {
+    ch == Some('}')
+}
+
+fn is_close(ch: Option<char>) -> bool {
+    ch == Some(')') || ch == Some(']') || ch == Some('}')
 }
 
 fn keywords_in_map() -> HashMap<&'static str, TokenKind> {
