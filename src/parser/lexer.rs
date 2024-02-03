@@ -62,7 +62,9 @@ impl<'a> Lexer<'a> {
         } else if is_digit_or_minus(ch) {
             self.read_number(false, self.offset())
         } else if is_sharp(ch) {
-            self.read_sharps()
+            self.read_sharp()
+        } else if is_open(ch) {
+            self.read_collection_open()
         } else if is_symbol_start(ch) {
             self.read_symbol()
         } else if is_colon(ch) {
@@ -99,26 +101,39 @@ impl<'a> Lexer<'a> {
         LineComment
     }
 
-    fn read_sharps(&mut self) -> TokenKind {
+    fn read_sharp(&mut self) -> TokenKind {
         let start = self.offset();
         let ch = self.curr().expect("missing char");
         self.eat_char();
-        let span = self.span_from(start);
         let next = self.lookahead();
 
         match next {
-            Some('"') => self.read_regex(),
-            Some('{') => self.read_map(),
+            Some('"') => self.read_regex(start),
+            Some('{') => self.read_set_start(),
             _ => {
                 if is_symbol(next) {
                     self.read_type_id()
                 } else {
                     self.report_error_at(
                         ParseError::ExpectedToken("'\"', '{' or symbol".to_string()),
-                        span,
+                        self.span_from(start),
                     );
                     Error
                 }
+            }
+        }
+    }
+
+    fn read_collection_open(&mut self) -> TokenKind {
+        let ch = self.curr().expect("missing char");
+        self.eat_char();
+
+        match ch {
+            '(' => ListOpen,
+            '[' => VectorOpen,
+            '{' => MapOpen,
+            _ => {
+                unreachable!()
             }
         }
     }
@@ -148,7 +163,6 @@ impl<'a> Lexer<'a> {
     fn read_keyword(&mut self) -> TokenKind {
         self.eat_char();
         let value = self.read_symbol_as_string();
-
         KeywordLiteral
     }
 
@@ -189,9 +203,12 @@ impl<'a> Lexer<'a> {
         StringLiteral
     }
 
-    fn read_regex(&mut self) -> TokenKind {
-        let mut start = self.offset();
+    fn read_set_start(&mut self) -> TokenKind {
+        self.eat_char();
+        SetOpen
+    }
 
+    fn read_regex(&mut self, start: u32) -> TokenKind {
         self.eat_char();
 
         while self.curr().is_some() && !is_double_quote(self.curr()) {
@@ -215,32 +232,10 @@ impl<'a> Lexer<'a> {
     // quoted vector
     // quoted map
     // quoted set
+    // dot
+    // slash
     // TODO:
     fn read_quote(&mut self) -> TokenKind {}
-
-    // TODO:
-    fn read_operator(&mut self) -> TokenKind {
-        let ch = self.curr().unwrap();
-        self.eat_char();
-
-        let nch = self.curr().unwrap_or('x');
-        let nnch = self.lookahead().unwrap_or('x');
-
-        match ch {
-            '(' => LParen,
-            ')' => RParen,
-            '[' => LBracket,
-            ']' => RBracket,
-            '{' => LBrace,
-            '}' => RBrace,
-            '&' => And,
-            ';' => LineComment,
-            '.' => Dot,
-            _ => {
-                unreachable!()
-            }
-        }
-    }
 
     fn read_number(&mut self, second_time: bool, start: u32) -> TokenKind {
         if self.curr() == Some('-') {
@@ -519,6 +514,10 @@ fn is_close_brace(ch: Option<char>) -> bool {
 
 fn is_close(ch: Option<char>) -> bool {
     ch == Some(')') || ch == Some(']') || ch == Some('}')
+}
+
+fn is_open(ch: Option<char>) -> bool {
+    ch == Some('(') || ch == Some('[') || ch == Some('{')
 }
 
 fn keywords_in_map() -> HashMap<&'static str, TokenKind> {

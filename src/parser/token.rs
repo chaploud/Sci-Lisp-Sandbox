@@ -68,12 +68,17 @@ pub enum TokenKind {
     RightArrow,      // =>
 
     // brackets
-    LParen,   // (
-    RParen,   // )
-    LBracket, // [
-    RBracket, // ]
-    LBrace,   // {
-    RBrace,   // }
+    ListClose,   // )
+    VectorClose, // ]
+    RBrace,      // }
+    MapClose,    // }
+    SetClose,    // }
+
+    // collections
+    ListOpen,   // (
+    VectorOpen, // [
+    MapOpen,    // {
+    SetOpen,    // #{
 
     // trivial
     Whitespace,  // , is treated as whitespace
