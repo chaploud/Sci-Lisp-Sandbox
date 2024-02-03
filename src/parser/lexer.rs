@@ -591,6 +591,7 @@ mod tests {
     use crate::parser::error::{ParseError, ParseErrorWithLocation};
     use crate::parser::lexer::lex;
     use crate::parser::token::TokenKind;
+    use crate::parser::token::TokenKind::*;
 
     fn lex_success(content: &str) -> Vec<(TokenKind, u32)> {
         let result = lex(content);
@@ -643,176 +644,121 @@ mod tests {
 
     #[test]
     fn test_read_numbers() {
-        let tokens = lex_success("1 2\n0123 10");
+        let tokens = lex_success("1 2\n0123 1_000_000");
         assert_eq!(
             tokens,
             vec![
-                (INT_LITERAL, 1),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 1),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 4),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 2),
-            ]
-        );
-
-        let tokens = lex_success("12u8 300u8 1_000 1__1");
-        assert_eq!(
-            tokens,
-            vec![
-                (INT_LITERAL, 4),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 5),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 5),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 4),
-            ]
-        );
-    }
-
-    #[test]
-    fn test_read_numbers_with_suffix() {
-        let tokens = lex_success("1i32 2u8 3i64");
-        assert_eq!(
-            tokens,
-            vec![
-                (INT_LITERAL, 4),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 3),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 4),
+                (I64Literal, 1),
+                (Whitespace, 1),
+                (I64Literal, 1),
+                (Whitespace, 1),
+                (I64Literal, 4),
+                (Whitespace, 1),
+                (I64Literal, 9),
             ]
         );
     }
 
     #[test]
     fn test_skip_single_line_comment() {
-        let tokens = lex_success("//test\n1");
+        let tokens = lex_success("; test\n1");
         assert_eq!(
             tokens,
-            vec![(LINE_COMMENT, 6), (WHITESPACE, 1), (INT_LITERAL, 1)]
+            vec![(LineComment, 6), (Whitespace, 1), (I64Literal, 1)]
         );
     }
 
     #[test]
     fn test_unfinished_line_comment() {
-        let tokens = lex_success("//abc");
-        assert_eq!(tokens, &[(LINE_COMMENT, 5)]);
+        let tokens = lex_success(";;abc");
+        assert_eq!(tokens, &[(LineComment, 5)]);
     }
 
     #[test]
-    fn test_skip_multi_comment() {
-        let tokens = lex_success("/*test*/1");
-        assert_eq!(tokens, &[(MULTILINE_COMMENT, 8), (INT_LITERAL, 1)]);
-    }
-
-    #[test]
-    fn test_unfinished_multi_comment() {
-        let (tokens, errors) = lex_test("/*test");
-        assert_eq!(tokens, &[(MULTILINE_COMMENT, 6)]);
-        assert_err(errors, ParseError::UnclosedComment, 0, 6);
-
-        let (tokens, errors) = lex_test("1/*test");
-        assert_eq!(tokens, &[(INT_LITERAL, 1), (MULTILINE_COMMENT, 6)]);
-        assert_err(errors, ParseError::UnclosedComment, 1, 6);
-    }
-
-    #[test]
-    fn test_read_identifier() {
+    fn test_read_symbol() {
         let tokens = lex_success("abc ident test");
         assert_eq!(
             tokens,
             vec![
-                (IDENTIFIER, 3),
-                (WHITESPACE, 1),
-                (IDENTIFIER, 5),
-                (WHITESPACE, 1),
-                (IDENTIFIER, 4),
-            ]
-        );
-    }
-
-    #[test]
-    fn test_code_with_spaces() {
-        let tokens = lex_success("1 2 3");
-        assert_eq!(
-            tokens,
-            vec![
-                (INT_LITERAL, 1),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 1),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 1)
+                (Symbol, 3),
+                (Whitespace, 1),
+                (Symbol, 5),
+                (Whitespace, 1),
+                (Symbol, 4),
             ]
         );
     }
 
     #[test]
     fn test_float_numbers() {
-        let tokens = lex_success("1f32 1.0 0.1f32 1.3f64 4f64");
+        let tokens = lex_success("1. 2. 3.0 4.5 0.6789 -1.2 -0.0");
         assert_eq!(
             tokens,
             vec![
-                (INT_LITERAL, 4),
-                (WHITESPACE, 1),
-                (FLOAT_LITERAL, 3),
-                (WHITESPACE, 1),
-                (FLOAT_LITERAL, 6),
-                (WHITESPACE, 1),
-                (FLOAT_LITERAL, 6),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 4),
+                (F64Literal, 2),
+                (Whitespace, 1),
+                (F64Literal, 2),
+                (Whitespace, 1),
+                (F64Literal, 3),
+                (Whitespace, 1),
+                (F64Literal, 3),
+                (Whitespace, 1),
+                (F64Literal, 6),
+                (Whitespace, 1),
+                (F64Literal, 4),
+                (Whitespace, 1),
+                (F64Literal, 4),
             ]
         );
     }
 
     #[test]
     fn test_float_scientific_notation() {
-        let tokens = lex_success("1.0e1 1.0E1 1.0e+1 1.0e-1");
+        let tokens = lex_success("1.e1 1.0e1 1.0E1 -1.0e+1 1.0e-1");
         assert_eq!(
             tokens,
             vec![
-                (FLOAT_LITERAL, 5),
-                (WHITESPACE, 1),
-                (FLOAT_LITERAL, 5),
-                (WHITESPACE, 1),
-                (FLOAT_LITERAL, 6),
-                (WHITESPACE, 1),
-                (FLOAT_LITERAL, 6),
+                (F64Literal, 4),
+                (Whitespace, 1),
+                (F64Literal, 5),
+                (Whitespace, 1),
+                (F64Literal, 5),
+                (Whitespace, 1),
+                (F64Literal, 7),
+                (Whitespace, 1),
+                (F64Literal, 6),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_float_nan_inf() {
+        let tokens = lex_success("nan inf -inf");
+        assert_eq!(
+            tokens,
+            vec![
+                (F64Literal, 3),
+                (Whitespace, 1),
+                (F64Literal, 3),
+                (Whitespace, 1),
+                (F64Literal, 4),
             ]
         );
     }
 
     #[test]
     fn test_hex_numbers() {
-        let tokens = lex_success("0x1 0x2i64 0xABCDEF 0xB1i64");
+        let tokens = lex_success("0x1 0x2 0xABCDEF 0xB1");
         assert_eq!(
             tokens,
             vec![
-                (INT_LITERAL, 3),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 6),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 8),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 7),
-            ]
-        );
-    }
-
-    #[test]
-    fn test_code_with_newlines() {
-        let tokens = lex_success("1\n2\n3");
-        assert_eq!(
-            tokens,
-            vec![
-                (INT_LITERAL, 1),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 1),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 1)
+                (I64Literal, 3),
+                (Whitespace, 1),
+                (I64Literal, 6),
+                (Whitespace, 1),
+                (I64Literal, 8),
+                (Whitespace, 1),
+                (I64Literal, 7),
             ]
         );
     }
@@ -823,11 +769,11 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                (INT_LITERAL, 1),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 1),
-                (WHITESPACE, 1),
-                (INT_LITERAL, 1)
+                (I64Literal, 1),
+                (Whitespace, 1),
+                (I64Literal, 1),
+                (Whitespace, 1),
+                (I64Literal, 1)
             ]
         );
     }
@@ -835,190 +781,143 @@ mod tests {
     #[test]
     fn test_string_with_newline() {
         let tokens = lex_success("\"abc\ndef\"");
-        assert_eq!(tokens, vec![(STRING_LITERAL, 9),]);
+        assert_eq!(tokens, vec![(StringLiteral, 9),]);
     }
 
     #[test]
     fn test_escape_sequences() {
         let tokens = lex_success("\"\\\"\"");
-        assert_eq!(tokens, vec![(STRING_LITERAL, 4)]);
+        assert_eq!(tokens, vec![(StringLiteral, 4)]);
 
         let tokens = lex_success("\"\\$\"");
-        assert_eq!(tokens, &[(STRING_LITERAL, 4)]);
+        assert_eq!(tokens, &[(StringLiteral, 4)]);
 
         let tokens = lex_success("\"\\\'\"");
-        assert_eq!(tokens, &[(STRING_LITERAL, 4)]);
+        assert_eq!(tokens, &[(StringLiteral, 4)]);
 
         let tokens = lex_success("\"\\t\"");
-        assert_eq!(tokens, &[(STRING_LITERAL, 4)]);
+        assert_eq!(tokens, &[(StringLiteral, 4)]);
 
         let tokens = lex_success("\"\\n\"");
-        assert_eq!(tokens, &[(STRING_LITERAL, 4)]);
+        assert_eq!(tokens, &[(StringLiteral, 4)]);
 
         let tokens = lex_success("\"\\r\"");
-        assert_eq!(tokens, &[(STRING_LITERAL, 4)]);
+        assert_eq!(tokens, &[(StringLiteral, 4)]);
 
         let tokens = lex_success("\"\\\\\"");
-        assert_eq!(tokens, &[(STRING_LITERAL, 4)]);
+        assert_eq!(tokens, &[(StringLiteral, 4)]);
 
         let (tokens, errors) = lex_test("\"\\");
-        assert_eq!(tokens, vec![(STRING_LITERAL, 2)]);
+        assert_eq!(tokens, vec![(StringLiteral, 2)]);
         assert_err(errors, ParseError::UnclosedString, 0, 2);
     }
 
     #[test]
     fn test_unclosed_string() {
         let (tokens, errors) = lex_test("\"abc");
-        assert_eq!(tokens, &[(STRING_LITERAL, 4)]);
+        assert_eq!(tokens, &[(StringLiteral, 4)]);
         assert_err(errors, ParseError::UnclosedString, 0, 4);
-    }
-
-    #[test]
-    fn test_unclosed_char() {
-        let (tokens, errors) = lex_test("'a");
-        assert_eq!(tokens, &[(CHAR_LITERAL, 2)]);
-        assert_err(errors, ParseError::UnclosedChar, 0, 2);
-
-        let (tokens, errors) = lex_test("'\\");
-        assert_eq!(tokens, &[(CHAR_LITERAL, 2)]);
-        assert_err(errors, ParseError::UnclosedChar, 0, 2);
-
-        let (tokens, errors) = lex_test("'\\n");
-        assert_eq!(tokens, &[(CHAR_LITERAL, 3)]);
-        assert_err(errors, ParseError::UnclosedChar, 0, 3);
-
-        let tokens = lex_success("'ab'");
-        assert_eq!(tokens, &[(CHAR_LITERAL, 4)]);
-
-        let (tokens, errors) = lex_test("'");
-        assert_eq!(tokens, &[(CHAR_LITERAL, 1)]);
-        assert_err(errors, ParseError::UnclosedChar, 0, 1);
     }
 
     #[test]
     fn test_string() {
         let tokens = lex_success("\"abc\"");
-        assert_eq!(tokens, &[(STRING_LITERAL, 5)]);
+        assert_eq!(tokens, &[(StringLiteral, 5)]);
     }
 
     #[test]
     fn test_keywords() {
-        let tokens = lex_success("fn let while if else match");
-        assert_eq!(
-            tokens,
-            vec![
-                (FN_KW, 2),
-                (WHITESPACE, 1),
-                (LET_KW, 3),
-                (WHITESPACE, 1),
-                (WHILE_KW, 5),
-                (WHITESPACE, 1),
-                (IF_KW, 2),
-                (WHITESPACE, 1),
-                (ELSE_KW, 4),
-                (WHITESPACE, 1),
-                (MATCH_KW, 5),
-            ]
+        let tokens = lex_success(
+            "true \
+            false \
+            nil \
+            def \
+            const \
+            let \
+            set! \
+            defn \
+            fn \
+            return \
+            if \
+            when \
+            cond \
+            do \
+            switch \
+            for \
+            while \
+            break \
+            continue \
+            enum \
+            struct \
+            method \
+            self \
+            macro \
+            try \
+            throw \
+            catch \
+            finally \
+            import",
         );
-
-        let tokens = lex_success("self class super mod");
         assert_eq!(
             tokens,
             vec![
-                (SELF_KW, 4),
-                (WHITESPACE, 1),
-                (CLASS_KW, 5),
-                (WHITESPACE, 1),
-                (SUPER_KW, 5),
-                (WHITESPACE, 1),
-                (MOD_KW, 3),
-            ]
-        );
-
-        let tokens = lex_success("break continue return");
-        assert_eq!(
-            tokens,
-            vec![
-                (BREAK_KW, 5),
-                (WHITESPACE, 1),
-                (CONTINUE_KW, 8),
-                (WHITESPACE, 1),
-                (RETURN_KW, 6),
-            ]
-        );
-
-        let tokens = lex_success("type struct enum trait const");
-        assert_eq!(
-            tokens,
-            vec![
-                (TYPE_KW, 4),
-                (WHITESPACE, 1),
-                (STRUCT_KW, 6),
-                (WHITESPACE, 1),
-                (ENUM_KW, 4),
-                (WHITESPACE, 1),
-                (TRAIT_KW, 5),
-                (WHITESPACE, 1),
-                (CONST_KW, 5),
-            ]
-        );
-
-        let tokens = lex_success("for in impl Self mut");
-        assert_eq!(
-            tokens,
-            vec![
-                (FOR_KW, 3),
-                (WHITESPACE, 1),
-                (IN_KW, 2),
-                (WHITESPACE, 1),
-                (IMPL_KW, 4),
-                (WHITESPACE, 1),
-                (UPCASE_SELF_KW, 4),
-                (WHITESPACE, 1),
-                (MUT_KW, 3),
-            ]
-        );
-    }
-
-    #[test]
-    fn test_operators() {
-        let tokens = lex_success("==-*/%.@...,");
-        assert_eq!(
-            tokens,
-            vec![
-                (EQ_EQ, 2),
-                (SUB, 1),
-                (MUL, 1),
-                (DIV, 1),
-                (MODULO, 1),
-                (DOT, 1),
-                (AT, 1),
-                (DOT_DOT_DOT, 3),
-                (COMMA, 1),
-            ]
-        );
-
-        let tokens = lex_success("<=<>=><");
-        assert_eq!(tokens, vec![(LE, 2), (LT, 1), (GE, 2), (GT, 1), (LT, 1),]);
-
-        let tokens = lex_success("!=====!");
-        assert_eq!(tokens, vec![(NOT_EQ_EQ, 3), (EQ_EQ_EQ, 3), (NOT, 1),]);
-
-        let tokens = lex_success("!=!");
-        assert_eq!(tokens, vec![(NOT_EQ, 2), (NOT, 1),]);
-
-        let tokens = lex_success("=>->");
-        assert_eq!(tokens, vec![(DOUBLE_ARROW, 2), (ARROW, 2),]);
-
-        let tokens = lex_success(">><<>>>_::");
-        assert_eq!(
-            tokens,
-            vec![
-                (GT_GT, 2),
-                (LT_LT, 2),
-                (GT_GT_GT, 3),
-                (UNDERSCORE, 1),
-                (COLON_COLON, 2),
+                (True, 4),
+                (Whitespace, 1),
+                (False, 5),
+                (Whitespace, 1),
+                (Nil, 3),
+                (Whitespace, 1),
+                (DefKw, 3),
+                (Whitespace, 1),
+                (ConstKw, 5),
+                (Whitespace, 1),
+                (LetKw, 3),
+                (Whitespace, 1),
+                (SeteKw, 4),
+                (Whitespace, 1),
+                (DefnKw, 4),
+                (Whitespace, 1),
+                (FnKw, 2),
+                (Whitespace, 1),
+                (ReturnKw, 6),
+                (Whitespace, 1),
+                (IfKw, 2),
+                (Whitespace, 1),
+                (WhenKw, 4),
+                (Whitespace, 1),
+                (CondKw, 4),
+                (Whitespace, 1),
+                (DoKw, 2),
+                (Whitespace, 1),
+                (SwitchKw, 6),
+                (Whitespace, 1),
+                (ForKw, 3),
+                (Whitespace, 1),
+                (WhileKw, 5),
+                (Whitespace, 1),
+                (BreakKw, 5),
+                (Whitespace, 1),
+                (ContinueKw, 8),
+                (Whitespace, 1),
+                (EnumKw, 4),
+                (Whitespace, 1),
+                (StructKw, 6),
+                (Whitespace, 1),
+                (MethodKw, 6),
+                (Whitespace, 1),
+                (SelfKw, 4),
+                (Whitespace, 1),
+                (MacroKw, 5),
+                (Whitespace, 1),
+                (TryKw, 3),
+                (Whitespace, 1),
+                (ThrowKw, 5),
+                (Whitespace, 1),
+                (CatchKw, 5),
+                (Whitespace, 1),
+                (FinallyKw, 7),
+                (Whitespace, 1),
+                (ImportKw, 6),
             ]
         );
     }
@@ -1026,23 +925,7 @@ mod tests {
     #[test]
     fn test_invalid_char() {
         let (tokens, errors) = lex_test("a☕b");
-        assert_eq!(tokens, vec![(IDENTIFIER, 1), (UNKNOWN, 3), (IDENTIFIER, 1)]);
+        assert_eq!(tokens, vec![(Symbol, 1), (Unknown, 3), (Symbol, 1)]);
         assert_err(errors, ParseError::UnknownChar('☕'), 1, 3);
-    }
-
-    #[test]
-    fn test_string_template() {
-        let tokens = lex_success(r#""1${a}2${b}3"{}"#);
-        assert_eq!(
-            dump_tokens(tokens),
-            r#"TEMPLATE_LITERAL@0..4
-IDENTIFIER@4..5
-TEMPLATE_LITERAL@5..9
-IDENTIFIER@9..10
-TEMPLATE_END_LITERAL@10..13
-L_BRACE@13..14
-R_BRACE@14..15
-"#
-        );
     }
 }

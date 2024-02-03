@@ -11,10 +11,10 @@ nil                 ; nil
 0o777               ; i64 (octal)
 0xff                ; i64 (hex)
 -3.14e15            ; f64
-nan                 ; Not a Number
-inf                 ; positive infinity
--inf                ; negative infinity
--0.0                ; negative zero
+nan                 ; f64: Not a Number
+inf                 ; f64: positive infinity
+-inf                ; f64: negative infinity
+-0.0                ; f64: negative zero
 -1.2+3.4j           ; c64 (complex number)
 :keyword            ; keyword symbol
 'symbol             ; quoted symbol
