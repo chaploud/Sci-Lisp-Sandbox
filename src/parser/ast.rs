@@ -10,6 +10,19 @@ use crate::parser::token::TokenKind::*;
 pub mod dump;
 pub mod visit;
 
+/*
+リテラルはそのまま評価される
+記号
+' ` ~ ~@ @
+| スライス
+. オブジェクトのメンバ、メソッド, Enumのメンバ
+/ モジュールの名前/関数の名前
+& デストラクチャリングやrest
+
+キーワードを含むリスト: 最適化のために各々の処理を組み込みで定義してしまう
+(), [], {}, #{}, 内側から再帰的に評価される => Listの場合注意
+*/
+
 #[derive(Clone, Debug)]
 pub struct File {
     pub green: GreenNode,
@@ -18,23 +31,13 @@ pub struct File {
 
 impl File {
     #[cfg(test)]
-    pub fn fct0(&self) -> &Function {
+    pub fn function0(&self) -> &Function {
         self.elements[0].to_function().unwrap()
     }
 
     #[cfg(test)]
-    pub fn fct(&self, index: usize) -> &Function {
+    pub fn function(&self, index: usize) -> &Function {
         self.elements[index].to_function().unwrap()
-    }
-
-    #[cfg(test)]
-    pub fn cls0(&self) -> &Class {
-        self.elements[0].to_class().unwrap()
-    }
-
-    #[cfg(test)]
-    pub fn cls(&self, index: usize) -> &Class {
-        self.elements[index].to_class().unwrap()
     }
 
     #[cfg(test)]
@@ -48,35 +51,9 @@ impl File {
     }
 
     #[cfg(test)]
-    pub fn alias0(&self) -> &Alias {
-        self.elements[0].to_alias().unwrap()
-    }
-
-    #[cfg(test)]
-    pub fn module0(&self) -> &Module {
-        self.elements[0].to_module().unwrap()
-    }
-
-    #[cfg(test)]
-    pub fn trait_(&self, index: usize) -> &Trait {
-        self.elements[index].to_trait().unwrap()
-    }
-
-    #[cfg(test)]
-    pub fn trait0(&self) -> &Trait {
-        self.elements[0].to_trait().unwrap()
-    }
-
-    #[cfg(test)]
-    pub fn impl0(&self) -> &Impl {
-        self.elements[0].to_impl().unwrap()
-    }
-
-    #[cfg(test)]
     pub fn global0(&self) -> &Global {
         self.elements[0].to_global().unwrap()
     }
-
     #[cfg(test)]
     pub fn const0(&self) -> &Const {
         self.elements[0].to_const().unwrap()
@@ -96,120 +73,71 @@ pub type Elem = Arc<ElemData>;
 
 #[derive(Clone, Debug)]
 pub enum ElemData {
-    Function(Arc<Function>),
-    Class(Arc<Class>),
-    Struct(Arc<Struct>),
-    Trait(Arc<Trait>),
-    Impl(Arc<Impl>),
-    Global(Arc<Global>),
-    Const(Arc<Const>),
-    Enum(Arc<Enum>),
-    Alias(Arc<Alias>),
-    Module(Arc<Module>),
-    Use(Arc<Use>),
-    Extern(Arc<ExternPackage>),
-    TypeAlias(Arc<TypeAlias>),
+    List(Arc<List>),
+    Vector(Arc<Vector>),
+    Map(Arc<Map>),
+    Set(Arc<Set>),
+    Slice(Arc<Slice>),
+    Atom(Arc<Atom>),
     Error { id: NodeId, span: Span },
 }
 
 impl ElemData {
     pub fn span(&self) -> Span {
         match self {
-            ElemData::Function(ref node) => node.span,
-            ElemData::Class(ref node) => node.span,
-            ElemData::Struct(ref node) => node.span,
-            ElemData::Trait(ref node) => node.span,
-            ElemData::Impl(ref node) => node.span,
-            ElemData::Global(ref node) => node.span,
-            ElemData::Const(ref node) => node.span,
-            ElemData::Enum(ref node) => node.span,
-            ElemData::Alias(ref node) => node.span,
-            ElemData::Module(ref node) => node.span,
-            ElemData::Use(ref node) => node.span,
-            ElemData::Extern(ref node) => node.span,
-            ElemData::TypeAlias(ref node) => node.span,
+            ElemData::List(ref node) => node.span,
+            ElemData::Vector(ref node) => node.span,
+            ElemData::Map(ref node) => node.span,
+            ElemData::Set(ref node) => node.span,
+            ElemData::Slice(ref node) => node.span,
+            ElemData::Atom(ref node) => node.span,
             ElemData::Error { span, .. } => span.clone(),
         }
     }
 
-    pub fn to_function(&self) -> Option<&Function> {
+    pub fn to_list(&self) -> Option<&List> {
         match self {
-            &ElemData::Function(ref fct) => Some(fct),
+            &ElemData::List(ref l) => Some(l),
             _ => None,
         }
     }
 
-    pub fn to_class(&self) -> Option<&Class> {
+    pub fn to_vector(&self) -> Option<&Vector> {
         match self {
-            &ElemData::Class(ref class) => Some(class),
+            &ElemData::Vector(ref v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn to_enum(&self) -> Option<&Enum> {
+    pub fn to_map(&self) -> Option<&Map> {
         match self {
-            &ElemData::Enum(ref enum_) => Some(enum_),
+            &ElemData::Map(ref m) => Some(m),
             _ => None,
         }
     }
 
-    pub fn to_alias(&self) -> Option<&Alias> {
+    pub fn to_set(&self) -> Option<&Set> {
         match self {
-            &ElemData::Alias(ref alias) => Some(alias),
+            &ElemData::Set(ref s) => Some(s),
             _ => None,
         }
     }
 
-    pub fn to_module(&self) -> Option<&Module> {
+    pub fn to_slice(&self) -> Option<&Slice> {
         match self {
-            &ElemData::Module(ref module) => Some(module),
-            _ => None,
-        }
-    }
-
-    pub fn to_struct(&self) -> Option<&Struct> {
-        match self {
-            &ElemData::Struct(ref struc) => Some(struc),
-            _ => None,
-        }
-    }
-
-    pub fn to_trait(&self) -> Option<&Trait> {
-        match self {
-            &ElemData::Trait(ref trait_) => Some(trait_),
-            _ => None,
-        }
-    }
-
-    pub fn to_impl(&self) -> Option<&Impl> {
-        match self {
-            &ElemData::Impl(ref impl_) => Some(impl_),
-            _ => None,
-        }
-    }
-
-    pub fn to_global(&self) -> Option<&Global> {
-        match self {
-            &ElemData::Global(ref global) => Some(global),
-            _ => None,
-        }
-    }
-
-    pub fn to_const(&self) -> Option<&Const> {
-        match self {
-            &ElemData::Const(ref konst) => Some(konst),
+            &ElemData::Slice(ref sl) => Some(sl),
             _ => None,
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct IdentData {
+pub struct SymData {
     pub span: Span,
     pub name_as_string: String,
 }
 
-pub type Ident = Arc<IdentData>;
+pub type Sym = Arc<SymData>;
 
 #[derive(Clone, Debug)]
 pub struct Global {
@@ -217,88 +145,10 @@ pub struct Global {
     pub span: Span,
     pub green: GreenNode,
     pub modifiers: Option<ModifierList>,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
     pub mutable: bool,
     pub data_type: Type,
     pub initial_value: Option<Expr>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Module {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub modifiers: Option<ModifierList>,
-    pub name: Option<Ident>,
-    pub elements: Option<Vec<Elem>>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Use {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub modifiers: Option<ModifierList>,
-    pub path: Arc<UsePath>,
-}
-
-#[derive(Clone, Debug)]
-pub struct UsePath {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub path: Vec<UseAtom>,
-    pub target: UsePathDescriptor,
-}
-
-#[derive(Clone, Debug)]
-pub enum UsePathDescriptor {
-    Default,
-    As(UseTargetName),
-    Group(Arc<UseGroup>),
-    Error,
-}
-
-#[derive(Clone, Debug)]
-pub struct UseGroup {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub targets: Vec<Arc<UsePath>>,
-}
-
-#[derive(Clone, Debug)]
-pub struct UseTargetName {
-    pub green: GreenNode,
-    pub span: Span,
-    pub name: Option<Ident>,
-}
-
-#[derive(Clone, Debug)]
-pub struct UseAtom {
-    pub green: GreenNode,
-    pub span: Span,
-    pub value: UsePathComponentValue,
-}
-
-#[derive(Clone, Debug)]
-pub enum UsePathComponentValue {
-    This,
-    Super,
-    Package,
-    Name(Ident),
-    Error,
-}
-
-#[derive(Clone, Debug)]
-pub struct Const {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub modifiers: Option<ModifierList>,
-    pub name: Option<Ident>,
-    pub data_type: Type,
-    pub expr: Expr,
 }
 
 #[derive(Clone, Debug)]
@@ -307,10 +157,9 @@ pub struct Enum {
     pub span: Span,
     pub green: GreenNode,
     pub modifiers: Option<ModifierList>,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
     pub type_params: Option<TypeParams>,
     pub variants: Vec<EnumVariant>,
-    pub where_bounds: Option<WhereBounds>,
 }
 
 #[derive(Clone, Debug)]
@@ -318,18 +167,8 @@ pub struct EnumVariant {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
     pub types: Option<Vec<Type>>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Alias {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub modifiers: Option<ModifierList>,
-    pub name: Option<Ident>,
-    pub ty: Type,
 }
 
 #[derive(Clone, Debug)]
@@ -338,10 +177,9 @@ pub struct Struct {
     pub span: Span,
     pub green: GreenNode,
     pub modifiers: Option<ModifierList>,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
     pub fields: Vec<StructField>,
     pub type_params: Option<TypeParams>,
-    pub where_bounds: Option<WhereBounds>,
 }
 
 #[derive(Clone, Debug)]
@@ -350,29 +188,8 @@ pub struct StructField {
     pub span: Span,
     pub green: GreenNode,
     pub modifiers: Option<ModifierList>,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
     pub data_type: Type,
-}
-
-pub type WhereBounds = Arc<WhereBoundsData>;
-
-#[derive(Clone, Debug)]
-pub struct WhereBoundsData {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub clauses: Vec<WhereClause>,
-}
-
-pub type WhereClause = Arc<WhereBoundData>;
-
-#[derive(Clone, Debug)]
-pub struct WhereBoundData {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub ty: Type,
-    pub bounds: Vec<Type>,
 }
 
 pub type Type = Arc<TypeData>;
@@ -381,7 +198,6 @@ pub type Type = Arc<TypeData>;
 pub enum TypeData {
     This(TypeSelfType),
     Basic(TypeBasicType),
-    Tuple(TypeTupleType),
     Lambda(TypeLambdaType),
     Path(TypePathType),
     Generic(TypeGenericType),
@@ -393,15 +209,6 @@ pub struct TypeSelfType {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
-}
-
-#[derive(Clone, Debug)]
-pub struct TypeTupleType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub subtypes: Vec<Type>,
 }
 
 #[derive(Clone, Debug)]
@@ -503,7 +310,7 @@ impl TypeData {
         })
     }
 
-    pub fn create_fct(
+    pub fn create_function(
         id: NodeId,
         span: Span,
         green: GreenNode,
@@ -519,15 +326,6 @@ impl TypeData {
         })
     }
 
-    pub fn create_tuple(id: NodeId, span: Span, green: GreenNode, subtypes: Vec<Type>) -> TypeData {
-        TypeData::Tuple(TypeTupleType {
-            id,
-            span,
-            green,
-            subtypes,
-        })
-    }
-
     pub fn to_basic(&self) -> Option<&TypeBasicType> {
         match *self {
             TypeData::Basic(ref val) => Some(val),
@@ -535,14 +333,7 @@ impl TypeData {
         }
     }
 
-    pub fn to_tuple(&self) -> Option<&TypeTupleType> {
-        match *self {
-            TypeData::Tuple(ref val) => Some(val),
-            _ => None,
-        }
-    }
-
-    pub fn to_fct(&self) -> Option<&TypeLambdaType> {
+    pub fn to_function(&self) -> Option<&TypeLambdaType> {
         match *self {
             TypeData::Lambda(ref val) => Some(val),
             _ => None,
@@ -590,7 +381,6 @@ impl TypeData {
         match *self {
             TypeData::This(ref val) => val.span,
             TypeData::Basic(ref val) => val.span,
-            TypeData::Tuple(ref val) => val.span,
             TypeData::Lambda(ref val) => val.span,
             TypeData::Error { span, .. } => span,
             TypeData::Path(ref val) => val.span,
@@ -602,7 +392,6 @@ impl TypeData {
         match *self {
             TypeData::This(ref val) => val.id,
             TypeData::Basic(ref val) => val.id,
-            TypeData::Tuple(ref val) => val.id,
             TypeData::Lambda(ref val) => val.id,
             TypeData::Error { id, .. } => id,
             TypeData::Path(ref val) => val.id,
@@ -612,40 +401,13 @@ impl TypeData {
 }
 
 #[derive(Clone, Debug)]
-pub struct Impl {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub modifiers: Option<ModifierList>,
-    pub type_params: Option<TypeParams>,
-    pub trait_type: Option<Type>,
-    pub extended_type: Type,
-    pub where_bounds: Option<WhereBounds>,
-
-    pub methods: Vec<Elem>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Trait {
-    pub id: NodeId,
-    pub name: Option<Ident>,
-    pub green: GreenNode,
-    pub modifiers: Option<ModifierList>,
-    pub type_params: Option<TypeParams>,
-    pub where_bounds: Option<WhereBounds>,
-    pub span: Span,
-    pub methods: Vec<Elem>,
-}
-
-#[derive(Clone, Debug)]
 pub struct TypeAlias {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
 
     pub modifiers: Option<ModifierList>,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
     pub bounds: Vec<Type>,
     pub ty: Option<Type>,
 }
@@ -656,11 +418,10 @@ pub struct Class {
     pub span: Span,
     pub green: GreenNode,
     pub modifiers: Option<ModifierList>,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
 
     pub fields: Vec<Field>,
     pub type_params: Option<TypeParams>,
-    pub where_bounds: Option<WhereBounds>,
 }
 
 #[derive(Clone, Debug)]
@@ -669,8 +430,8 @@ pub struct ExternPackage {
     pub span: Span,
     pub green: GreenNode,
     pub modifiers: Option<ModifierList>,
-    pub name: Option<Ident>,
-    pub identifier: Option<Ident>,
+    pub name: Option<Sym>,
+    pub identifier: Option<Sym>,
 }
 
 #[derive(Clone, Debug)]
@@ -682,7 +443,7 @@ pub struct TypeParams {
 #[derive(Clone, Debug)]
 pub struct TypeParam {
     pub span: Span,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
     pub bounds: Vec<Type>,
 }
 
@@ -692,7 +453,7 @@ pub struct Field {
     pub span: Span,
     pub green: GreenNode,
     pub modifiers: Option<ModifierList>,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
     pub data_type: Type,
     pub primary_ctor: bool,
     pub expr: Option<Expr>,
@@ -722,11 +483,10 @@ pub struct Function {
     pub modifiers: Option<ModifierList>,
     pub kind: FunctionKind,
 
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
     pub type_params: Option<TypeParams>,
     pub params: Vec<Param>,
     pub return_type: Option<Type>,
-    pub where_bounds: Option<WhereBounds>,
     pub block: Option<Expr>,
 }
 
@@ -736,61 +496,33 @@ impl Function {
     }
 }
 
-// remove in next step
-#[derive(Clone, Debug)]
-pub struct ModifierList {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub modifiers: Vec<Modifier>,
-}
-
-impl ModifierList {
-    pub fn iter(&self) -> Iter<Modifier> {
-        self.modifiers.iter()
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Modifier {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-}
-
-impl Modifier {
-    pub fn symbol_token(&self) -> Option<GreenToken> {
-        find_token(&self.green, Symbol)
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct Param {
     pub id: NodeId,
     pub span: Span,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
     pub mutable: bool,
     pub data_type: Type,
     pub variadic: bool,
 }
 
-pub type Stmt = Arc<StmtData>;
+pub type SpecialForm = Arc<SpecialFormData>;
 
 #[derive(Clone, Debug)]
-pub enum StmtData {
-    Let(StmtLetType),
-    Expr(StmtExprType),
+pub enum SpecialFormData {
+    Let(SpecialFormLetType),
+    Expr(SpecialFormExprType),
 }
 
-impl StmtData {
+impl SpecialFormData {
     pub fn create_let(
         id: NodeId,
         span: Span,
         pattern: Box<LetPattern>,
         data_type: Option<Type>,
         expr: Option<Expr>,
-    ) -> StmtData {
-        StmtData::Let(StmtLetType {
+    ) -> SpecialFormData {
+        SpecialFormData::Let(SpecialFormLetType {
             id,
             span,
 
@@ -800,48 +532,48 @@ impl StmtData {
         })
     }
 
-    pub fn create_expr(id: NodeId, span: Span, expr: Expr) -> StmtData {
-        StmtData::Expr(StmtExprType { id, span, expr })
+    pub fn create_expr(id: NodeId, span: Span, expr: Expr) -> SpecialFormData {
+        SpecialFormData::Expr(SpecialFormExprType { id, span, expr })
     }
 
     pub fn span(&self) -> Span {
         match *self {
-            StmtData::Let(ref stmt) => stmt.span,
-            StmtData::Expr(ref stmt) => stmt.span,
+            SpecialFormData::Let(ref SpecialForm) => SpecialForm.span,
+            SpecialFormData::Expr(ref SpecialForm) => SpecialForm.span,
         }
     }
 
-    pub fn to_let(&self) -> Option<&StmtLetType> {
+    pub fn to_let(&self) -> Option<&SpecialFormLetType> {
         match *self {
-            StmtData::Let(ref val) => Some(val),
+            SpecialFormData::Let(ref val) => Some(val),
             _ => None,
         }
     }
 
     pub fn is_let(&self) -> bool {
         match *self {
-            StmtData::Let(_) => true,
+            SpecialFormData::Let(_) => true,
             _ => false,
         }
     }
 
-    pub fn to_expr(&self) -> Option<&StmtExprType> {
+    pub fn to_expr(&self) -> Option<&SpecialFormExprType> {
         match *self {
-            StmtData::Expr(ref val) => Some(val),
+            SpecialFormData::Expr(ref val) => Some(val),
             _ => None,
         }
     }
 
     pub fn is_expr(&self) -> bool {
         match *self {
-            StmtData::Expr(_) => true,
+            SpecialFormData::Expr(_) => true,
             _ => false,
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct StmtLetType {
+pub struct SpecialFormLetType {
     pub id: NodeId,
     pub span: Span,
 
@@ -853,7 +585,7 @@ pub struct StmtLetType {
 
 #[derive(Clone, Debug)]
 pub enum LetPattern {
-    Ident(LetIdentType),
+    Sym(LetSymType),
     Tuple(LetTupleType),
     Underscore(LetUnderscoreType),
 }
@@ -861,7 +593,7 @@ pub enum LetPattern {
 impl LetPattern {
     pub fn is_ident(&self) -> bool {
         match self {
-            LetPattern::Ident(_) => true,
+            LetPattern::Sym(_) => true,
             _ => false,
         }
     }
@@ -882,14 +614,14 @@ impl LetPattern {
 
     pub fn to_name(&self) -> Option<String> {
         match self {
-            LetPattern::Ident(ref ident) => ident.name.as_ref().map(|i| i.name_as_string.clone()),
+            LetPattern::Sym(ref ident) => ident.name.as_ref().map(|i| i.name_as_string.clone()),
             _ => None,
         }
     }
 
-    pub fn to_ident(&self) -> Option<&LetIdentType> {
+    pub fn to_ident(&self) -> Option<&LetSymType> {
         match self {
-            LetPattern::Ident(ref ident) => Some(ident),
+            LetPattern::Sym(ref ident) => Some(ident),
             _ => None,
         }
     }
@@ -909,11 +641,11 @@ pub struct LetUnderscoreType {
 }
 
 #[derive(Clone, Debug)]
-pub struct LetIdentType {
+pub struct LetSymType {
     pub id: NodeId,
     pub span: Span,
     pub mutable: bool,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
 }
 
 #[derive(Clone, Debug)]
@@ -945,7 +677,7 @@ pub struct ExprWhileType {
 }
 
 #[derive(Clone, Debug)]
-pub struct StmtExprType {
+pub struct SpecialFormExprType {
     pub id: NodeId,
     pub span: Span,
 
@@ -1078,13 +810,13 @@ pub type Expr = Arc<ExprData>;
 pub enum ExprData {
     Un(ExprUnType),
     Bin(ExprBinType),
-    LitChar(ExprLitCharType),
-    LitInt(ExprLitIntType),
-    LitFloat(ExprLitFloatType),
-    LitStr(ExprLitStrType),
+    LiteralChar(ExprLiteralCharType),
+    LiteralInt(ExprLiteralIntType),
+    LiteralFloat(ExprLiteralFloatType),
+    LiteralStr(ExprLiteralStrType),
     Template(ExprTemplateType),
-    LitBool(ExprLitBoolType),
-    Ident(ExprIdentType),
+    LiteralBool(ExprLiteralBoolType),
+    Sym(ExprSymType),
     Call(ExprCallType),
     TypeParam(ExprTypeParamType),
     Path(ExprPathType),
@@ -1110,7 +842,7 @@ impl ExprData {
         id: NodeId,
         span: Span,
         green: GreenNode,
-        stmts: Vec<Stmt>,
+        SpecialForms: Vec<SpecialForm>,
         expr: Option<Expr>,
     ) -> ExprData {
         ExprData::Block(ExprBlockType {
@@ -1118,7 +850,7 @@ impl ExprData {
             span,
             green,
 
-            stmts,
+            SpecialForms,
             expr,
         })
     }
@@ -1242,13 +974,13 @@ impl ExprData {
         })
     }
 
-    pub fn create_lit_char(
+    pub fn create_literal_char(
         id: NodeId,
         span: Span,
         green: GreenNode,
         full_value: String,
     ) -> ExprData {
-        ExprData::LitChar(ExprLitCharType {
+        ExprData::LiteralChar(ExprLiteralCharType {
             id,
             span,
             green,
@@ -1256,8 +988,8 @@ impl ExprData {
         })
     }
 
-    pub fn create_lit_int(id: NodeId, span: Span, green: GreenNode, value: String) -> ExprData {
-        ExprData::LitInt(ExprLitIntType {
+    pub fn create_literal_int(id: NodeId, span: Span, green: GreenNode, value: String) -> ExprData {
+        ExprData::LiteralInt(ExprLiteralIntType {
             id,
             span,
             green,
@@ -1265,8 +997,13 @@ impl ExprData {
         })
     }
 
-    pub fn create_lit_float(id: NodeId, span: Span, green: GreenNode, value: String) -> ExprData {
-        ExprData::LitFloat(ExprLitFloatType {
+    pub fn create_literal_float(
+        id: NodeId,
+        span: Span,
+        green: GreenNode,
+        value: String,
+    ) -> ExprData {
+        ExprData::LiteralFloat(ExprLiteralFloatType {
             id,
             span,
             green,
@@ -1274,8 +1011,8 @@ impl ExprData {
         })
     }
 
-    pub fn create_lit_str(id: NodeId, span: Span, green: GreenNode, value: String) -> ExprData {
-        ExprData::LitStr(ExprLitStrType {
+    pub fn create_literal_str(id: NodeId, span: Span, green: GreenNode, value: String) -> ExprData {
+        ExprData::LiteralStr(ExprLiteralStrType {
             id,
             span,
             green,
@@ -1292,8 +1029,8 @@ impl ExprData {
         })
     }
 
-    pub fn create_lit_bool(id: NodeId, span: Span, value: bool) -> ExprData {
-        ExprData::LitBool(ExprLitBoolType { id, span, value })
+    pub fn create_literal_bool(id: NodeId, span: Span, value: bool) -> ExprData {
+        ExprData::LiteralBool(ExprLiteralBoolType { id, span, value })
     }
 
     pub fn create_this(id: NodeId, span: Span, green: GreenNode) -> ExprData {
@@ -1301,7 +1038,7 @@ impl ExprData {
     }
 
     pub fn create_ident(id: NodeId, span: Span, green: GreenNode, name: String) -> ExprData {
-        ExprData::Ident(ExprIdentType {
+        ExprData::Sym(ExprSymType {
             id,
             span,
             green,
@@ -1366,8 +1103,8 @@ impl ExprData {
         })
     }
 
-    pub fn create_lambda(fct: Arc<Function>) -> ExprData {
-        ExprData::Lambda(fct)
+    pub fn create_lambda(function: Arc<Function>) -> ExprData {
+        ExprData::Lambda(function)
     }
 
     pub fn create_tuple(id: NodeId, span: Span, green: GreenNode, values: Vec<Expr>) -> ExprData {
@@ -1449,16 +1186,16 @@ impl ExprData {
         }
     }
 
-    pub fn to_ident(&self) -> Option<&ExprIdentType> {
+    pub fn to_ident(&self) -> Option<&ExprSymType> {
         match *self {
-            ExprData::Ident(ref val) => Some(val),
+            ExprData::Sym(ref val) => Some(val),
             _ => None,
         }
     }
 
     pub fn is_ident(&self) -> bool {
         match *self {
-            ExprData::Ident(_) => true,
+            ExprData::Sym(_) => true,
             _ => false,
         }
     }
@@ -1505,30 +1242,30 @@ impl ExprData {
         }
     }
 
-    pub fn to_lit_char(&self) -> Option<&ExprLitCharType> {
+    pub fn to_literal_char(&self) -> Option<&ExprLiteralCharType> {
         match *self {
-            ExprData::LitChar(ref val) => Some(val),
+            ExprData::LiteralChar(ref val) => Some(val),
             _ => None,
         }
     }
 
-    pub fn is_lit_char(&self) -> bool {
+    pub fn is_literal_char(&self) -> bool {
         match *self {
-            ExprData::LitChar(_) => true,
+            ExprData::LiteralChar(_) => true,
             _ => false,
         }
     }
 
-    pub fn to_lit_int(&self) -> Option<&ExprLitIntType> {
+    pub fn to_literal_int(&self) -> Option<&ExprLiteralIntType> {
         match *self {
-            ExprData::LitInt(ref val) => Some(val),
+            ExprData::LiteralInt(ref val) => Some(val),
             _ => None,
         }
     }
 
-    pub fn is_lit_int(&self) -> bool {
+    pub fn is_literal_int(&self) -> bool {
         match *self {
-            ExprData::LitInt(_) => true,
+            ExprData::LiteralInt(_) => true,
             _ => false,
         }
     }
@@ -1547,51 +1284,51 @@ impl ExprData {
         }
     }
 
-    pub fn to_lit_float(&self) -> Option<&ExprLitFloatType> {
+    pub fn to_literal_float(&self) -> Option<&ExprLiteralFloatType> {
         match *self {
-            ExprData::LitFloat(ref val) => Some(val),
+            ExprData::LiteralFloat(ref val) => Some(val),
             _ => None,
         }
     }
 
-    pub fn is_lit_float(&self) -> bool {
+    pub fn is_literal_float(&self) -> bool {
         match *self {
-            ExprData::LitFloat(_) => true,
+            ExprData::LiteralFloat(_) => true,
             _ => false,
         }
     }
 
-    pub fn to_lit_str(&self) -> Option<&ExprLitStrType> {
+    pub fn to_literal_str(&self) -> Option<&ExprLiteralStrType> {
         match *self {
-            ExprData::LitStr(ref val) => Some(val),
+            ExprData::LiteralStr(ref val) => Some(val),
             _ => None,
         }
     }
 
-    pub fn is_lit_str(&self) -> bool {
+    pub fn is_literal_str(&self) -> bool {
         match *self {
-            ExprData::LitStr(_) => true,
+            ExprData::LiteralStr(_) => true,
             _ => false,
         }
     }
 
-    pub fn to_lit_bool(&self) -> Option<&ExprLitBoolType> {
+    pub fn to_literal_bool(&self) -> Option<&ExprLiteralBoolType> {
         match *self {
-            ExprData::LitBool(ref val) => Some(val),
+            ExprData::LiteralBool(ref val) => Some(val),
             _ => None,
         }
     }
 
-    pub fn is_lit_bool(&self) -> bool {
+    pub fn is_literal_bool(&self) -> bool {
         match *self {
-            ExprData::LitBool(_) => true,
+            ExprData::LiteralBool(_) => true,
             _ => false,
         }
     }
 
-    pub fn is_lit_true(&self) -> bool {
+    pub fn is_literal_true(&self) -> bool {
         match *self {
-            ExprData::LitBool(ref lit) if lit.value => true,
+            ExprData::LiteralBool(ref lit) if lit.value => true,
             _ => false,
         }
     }
@@ -1744,13 +1481,13 @@ impl ExprData {
         match *self {
             ExprData::Un(ref val) => val.span,
             ExprData::Bin(ref val) => val.span,
-            ExprData::LitChar(ref val) => val.span,
-            ExprData::LitInt(ref val) => val.span,
-            ExprData::LitFloat(ref val) => val.span,
-            ExprData::LitStr(ref val) => val.span,
+            ExprData::LiteralChar(ref val) => val.span,
+            ExprData::LiteralInt(ref val) => val.span,
+            ExprData::LiteralFloat(ref val) => val.span,
+            ExprData::LiteralStr(ref val) => val.span,
             ExprData::Template(ref val) => val.span,
-            ExprData::LitBool(ref val) => val.span,
-            ExprData::Ident(ref val) => val.span,
+            ExprData::LiteralBool(ref val) => val.span,
+            ExprData::Sym(ref val) => val.span,
             ExprData::Call(ref val) => val.span,
             ExprData::TypeParam(ref val) => val.span,
             ExprData::Path(ref val) => val.span,
@@ -1776,13 +1513,13 @@ impl ExprData {
         match *self {
             ExprData::Un(ref val) => val.id,
             ExprData::Bin(ref val) => val.id,
-            ExprData::LitChar(ref val) => val.id,
-            ExprData::LitInt(ref val) => val.id,
-            ExprData::LitFloat(ref val) => val.id,
-            ExprData::LitStr(ref val) => val.id,
+            ExprData::LiteralChar(ref val) => val.id,
+            ExprData::LiteralInt(ref val) => val.id,
+            ExprData::LiteralFloat(ref val) => val.id,
+            ExprData::LiteralStr(ref val) => val.id,
             ExprData::Template(ref val) => val.id,
-            ExprData::LitBool(ref val) => val.id,
-            ExprData::Ident(ref val) => val.id,
+            ExprData::LiteralBool(ref val) => val.id,
+            ExprData::Sym(ref val) => val.id,
             ExprData::Call(ref val) => val.id,
             ExprData::TypeParam(ref val) => val.id,
             ExprData::Path(ref val) => val.id,
@@ -1856,7 +1593,7 @@ pub struct ExprBinType {
 }
 
 #[derive(Clone, Debug)]
-pub struct ExprLitCharType {
+pub struct ExprLiteralCharType {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
@@ -1864,16 +1601,7 @@ pub struct ExprLitCharType {
 }
 
 #[derive(Clone, Debug)]
-pub struct ExprLitIntType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub value: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprLitFloatType {
+pub struct ExprLiteralIntType {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
@@ -1882,7 +1610,16 @@ pub struct ExprLitFloatType {
 }
 
 #[derive(Clone, Debug)]
-pub struct ExprLitStrType {
+pub struct ExprLiteralFloatType {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+
+    pub value: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprLiteralStrType {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
@@ -1900,7 +1637,7 @@ pub struct ExprTemplateType {
 }
 
 #[derive(Clone, Debug)]
-pub struct ExprLitBoolType {
+pub struct ExprLiteralBoolType {
     pub id: NodeId,
     pub span: Span,
 
@@ -1913,7 +1650,7 @@ pub struct ExprBlockType {
     pub span: Span,
     pub green: GreenNode,
 
-    pub stmts: Vec<Stmt>,
+    pub SpecialForms: Vec<SpecialForm>,
     pub expr: Option<Expr>,
 }
 
@@ -1925,7 +1662,7 @@ pub struct ExprSelfType {
 }
 
 #[derive(Clone, Debug)]
-pub struct ExprIdentType {
+pub struct ExprSymType {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
@@ -1998,11 +1735,11 @@ pub struct MatchPattern {
 #[derive(Clone, Debug)]
 pub enum MatchPatternData {
     Underscore,
-    Ident(MatchPatternIdent),
+    Sym(MatchPatternSym),
 }
 
 #[derive(Clone, Debug)]
-pub struct MatchPatternIdent {
+pub struct MatchPatternSym {
     pub path: Path,
     pub params: Option<Vec<MatchPatternParam>>,
 }
@@ -2011,7 +1748,7 @@ pub struct MatchPatternIdent {
 pub struct MatchPatternParam {
     pub id: NodeId,
     pub span: Span,
-    pub name: Option<Ident>,
+    pub name: Option<Sym>,
     pub mutable: bool,
 }
 
@@ -2021,7 +1758,7 @@ pub type Path = Arc<PathData>;
 pub struct PathData {
     pub id: NodeId,
     pub span: Span,
-    pub names: Vec<Ident>,
+    pub names: Vec<Sym>,
 }
 
 #[derive(Clone, Debug)]

@@ -102,10 +102,7 @@ pub const LAST_TOKEN: TokenKind = TokenKind::Eof;
 
 impl TokenKind {
     pub fn is_trivial(self) -> bool {
-        matches!(
-            self,
-            TokenKind::Whitespace | TokenKind::LineComment | TokenKind::Commma
-        )
+        matches!(self, TokenKind::Whitespace | TokenKind::LineComment)
     }
 
     pub fn is_eof(self) -> bool {

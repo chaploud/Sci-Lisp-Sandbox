@@ -12,13 +12,10 @@ use crate::parser::ast::*;
 use crate::parser::error::{ParseError, ParseErrorWithLocation};
 
 use crate::parser::green::{GreenTreeBuilder, Marker};
+use crate::parser::lexer::lex;
+use crate::parser::span::Span;
 use crate::parser::token::TokenKind::*;
-use crate::parser::token::{
-    ELEM_FIRST, EMPTY, ENUM_VARIANT_ARGUMENT_RS, ENUM_VARIANT_RS, EXPRESSION_FIRST, FIELD_FIRST,
-    LET_PATTERN_FIRST, LET_PATTERN_RS, MATCH_PATTERN_FIRST, MATCH_PATTERN_RS, MODIFIER_FIRST,
-    PARAM_LIST_RS, TYPE_PARAM_RS, USE_PATH_ATOM_FIRST, USE_PATH_FIRST,
-};
-use crate::parser::{lex, Span, TokenKind, TokenSet};
+use crate::parser::token::{TokenKind, TokenSet};
 
 pub fn compute_line_starts(content: &str) -> Vec<u32> {
     let mut line_starts = vec![0];
@@ -56,8 +53,8 @@ pub struct Parser {
     builder: GreenTreeBuilder,
 }
 
-enum StmtOrExpr {
-    Stmt(Stmt),
+enum SpecialOrExpr {
+    Special(SpecialForm),
     Expr(Expr),
 }
 
@@ -112,7 +109,7 @@ impl Parser {
             elements.push(self.parse_element());
         }
 
-        let green = self.builder.finish_node(SOURCE_FILE);
+        let green = self.builder.finish_node(SourceFile);
         ast::File { green, elements }
     }
 
@@ -120,62 +117,32 @@ impl Parser {
         self.builder.start_node();
         let modifiers = self.parse_modifiers();
         match self.current() {
-            FN_KW => {
-                let fct = self.parse_function(modifiers);
-                Arc::new(ElemData::Function(fct))
+            FnKw => {
+                let function = self.parse_function(modifiers);
+                Arc::new(ElemData::Function(function))
             }
 
-            CLASS_KW => {
-                let class = self.parse_class(modifiers);
-                Arc::new(ElemData::Class(class))
-            }
-
-            STRUCT_KW => {
+            StructKw => {
                 let struc = self.parse_struct(modifiers);
                 Arc::new(ElemData::Struct(struc))
             }
 
-            TRAIT_KW => {
-                let trait_ = self.parse_trait(modifiers);
-                Arc::new(ElemData::Trait(trait_))
-            }
-
-            IMPL_KW => {
-                let impl_ = self.parse_impl(modifiers);
-                Arc::new(ElemData::Impl(impl_))
-            }
-
-            LET_KW => {
+            LetKw => {
                 let global = self.parse_global(modifiers);
                 Arc::new(ElemData::Global(global))
             }
 
-            CONST_KW => {
+            ConstKw => {
                 let const_ = self.parse_const(modifiers);
                 Arc::new(ElemData::Const(const_))
             }
 
-            ENUM_KW => {
+            EnumKw => {
                 let enum_ = self.parse_enum(modifiers);
                 Arc::new(ElemData::Enum(enum_))
             }
 
-            MOD_KW => {
-                let module = self.parse_module(modifiers);
-                Arc::new(ElemData::Module(module))
-            }
-
-            USE_KW => {
-                let use_stmt = self.parse_use(modifiers);
-                Arc::new(ElemData::Use(use_stmt))
-            }
-
-            EXTERN_KW => {
-                let extern_stmt = self.parse_extern(modifiers);
-                Arc::new(ElemData::Extern(extern_stmt))
-            }
-
-            TYPE_KW => {
+            TypeKw => {
                 let type_alias = self.parse_type_alias(modifiers);
                 Arc::new(ElemData::TypeAlias(type_alias))
             }
@@ -185,7 +152,7 @@ impl Parser {
                 let span = self.current_span();
                 self.report_error_at(ParseError::ExpectedElement, span);
                 self.advance();
-                self.builder.finish_node(ERROR);
+                self.builder.finish_node(Error);
 
                 Arc::new(ElemData::Error {
                     id: self.new_node_id(),
@@ -193,171 +160,6 @@ impl Parser {
                 })
             }
         }
-    }
-
-    fn parse_extern(&mut self, modifiers: Option<ModifierList>) -> Arc<ExternPackage> {
-        self.start_node();
-
-        self.assert(EXTERN_KW);
-        self.expect(PACKAGE_KW);
-        let name = self.expect_identifier();
-        let identifier = if self.eat(AS) {
-            self.expect_identifier()
-        } else {
-            None
-        };
-
-        let green = self.builder.finish_node(EXTERN);
-
-        Arc::new(ExternPackage {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            modifiers,
-            name,
-            identifier,
-        })
-    }
-
-    fn parse_use(&mut self, modifiers: Option<ModifierList>) -> Arc<Use> {
-        self.start_node();
-        self.assert(USE_KW);
-        let path = self.parse_use_path();
-        self.expect(SEMICOLON);
-
-        let green = self.builder.finish_node(USE);
-
-        Arc::new(Use {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            modifiers,
-            path,
-        })
-    }
-
-    fn parse_use_path(&mut self) -> Arc<UsePath> {
-        self.start_node();
-        self.builder.start_node();
-        let mut path = Vec::new();
-
-        let target = if self.is_set(USE_PATH_ATOM_FIRST) {
-            path.push(self.parse_use_atom());
-
-            while self.is(COLON_COLON) && self.nth_is_set(1, USE_PATH_ATOM_FIRST) {
-                self.advance();
-                path.push(self.parse_use_atom());
-            }
-
-            if self.is(COLON_COLON) {
-                self.advance();
-
-                if self.is(L_BRACE) {
-                    UsePathDescriptor::Group(self.parse_use_group())
-                } else {
-                    self.report_error(ParseError::ExpectedUsePath);
-                    UsePathDescriptor::Error
-                }
-            } else if self.is(AS) {
-                UsePathDescriptor::As(self.parse_use_as())
-            } else {
-                UsePathDescriptor::Default
-            }
-        } else if self.is(L_BRACE) {
-            UsePathDescriptor::Group(self.parse_use_group())
-        } else {
-            self.report_error(ParseError::ExpectedUsePath);
-            UsePathDescriptor::Error
-        };
-
-        let green = self.builder.finish_node(USE_PATH);
-
-        Arc::new(UsePath {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            path,
-            target,
-        })
-    }
-
-    fn parse_use_as(&mut self) -> UseTargetName {
-        self.start_node();
-        self.builder.start_node();
-        self.assert(AS);
-
-        let name = if self.eat(UNDERSCORE) {
-            None
-        } else {
-            self.expect_identifier()
-        };
-
-        let green = self.builder.finish_node(USE_RENAME);
-
-        UseTargetName {
-            green,
-            span: self.finish_node(),
-            name,
-        }
-    }
-
-    fn parse_use_atom(&mut self) -> UseAtom {
-        assert!(self.is_set(USE_PATH_ATOM_FIRST));
-        self.start_node();
-        self.builder.start_node();
-
-        let value = if self.eat(SELF_KW) {
-            UsePathComponentValue::This
-        } else if self.eat(PACKAGE_KW) {
-            UsePathComponentValue::Package
-        } else if self.eat(SUPER_KW) {
-            UsePathComponentValue::Super
-        } else {
-            let name = self.expect_identifier();
-            if let Some(name) = name {
-                UsePathComponentValue::Name(name)
-            } else {
-                UsePathComponentValue::Error
-            }
-        };
-
-        let green = self.builder.finish_node(USE_COMPONENT);
-
-        UseAtom {
-            green,
-            span: self.finish_node(),
-            value,
-        }
-    }
-
-    fn parse_use_group(&mut self) -> Arc<UseGroup> {
-        self.start_node();
-        self.builder.start_node();
-
-        let targets = self.parse_list(
-            L_BRACE,
-            COMMA,
-            R_BRACE,
-            ELEM_FIRST,
-            ParseError::ExpectedUsePath,
-            USE_GROUP,
-            |p| {
-                if p.is_set(USE_PATH_FIRST) {
-                    Some(p.parse_use_path())
-                } else {
-                    None
-                }
-            },
-        );
-
-        let green = self.builder.finish_node(USE_GROUP);
-
-        Arc::new(UseGroup {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            targets,
-        })
     }
 
     fn parse_enum(&mut self, modifiers: Option<ModifierList>) -> Arc<Enum> {
@@ -397,38 +199,6 @@ impl Parser {
             name,
             type_params,
             variants,
-            where_bounds,
-        })
-    }
-
-    fn parse_module(&mut self, modifiers: Option<ModifierList>) -> Arc<Module> {
-        self.start_node();
-        self.assert(MOD_KW);
-        let name = self.expect_identifier();
-
-        let elements = if self.eat(L_BRACE) {
-            let mut elements = Vec::new();
-
-            while !self.is(R_BRACE) && !self.is_eof() {
-                elements.push(self.parse_element());
-            }
-
-            self.expect(R_BRACE);
-            Some(elements)
-        } else {
-            self.expect(SEMICOLON);
-            None
-        };
-
-        let green = self.builder.finish_node(MODULE);
-
-        Arc::new(Module {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            modifiers: modifiers.clone(),
-            name,
-            elements,
         })
     }
 
@@ -485,51 +255,9 @@ impl Parser {
         })
     }
 
-    fn parse_impl(&mut self, modifiers: Option<ModifierList>) -> Arc<Impl> {
-        self.start_node();
-        self.assert(IMPL_KW);
-        let type_params = self.parse_type_params();
-
-        let type_name = self.parse_type();
-
-        let (class_type, trait_type) = if self.eat(FOR_KW) {
-            let class_type = self.parse_type();
-
-            (class_type, Some(type_name))
-        } else {
-            (type_name, None)
-        };
-
-        let where_bounds = self.parse_where();
-
-        self.expect(L_BRACE);
-
-        let mut methods = Vec::new();
-
-        while !self.is(R_BRACE) && !self.is_eof() {
-            methods.push(self.parse_element());
-        }
-
-        self.expect(R_BRACE);
-
-        let green = self.builder.finish_node(IMPL);
-
-        Arc::new(Impl {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            modifiers,
-            type_params,
-            trait_type,
-            extended_type: class_type,
-            where_bounds,
-            methods,
-        })
-    }
-
     fn parse_global(&mut self, modifiers: Option<ModifierList>) -> Arc<Global> {
         self.start_node();
-        self.assert(LET_KW);
+        self.assert(LetKw);
 
         let mutable = self.eat(MUT_KW);
         let name = self.expect_identifier();
@@ -556,36 +284,6 @@ impl Parser {
             data_type,
             mutable,
             initial_value: expr.clone(),
-        })
-    }
-
-    fn parse_trait(&mut self, modifiers: Option<ModifierList>) -> Arc<Trait> {
-        self.start_node();
-        self.assert(TRAIT_KW);
-        let name = self.expect_identifier();
-        let type_params = self.parse_type_params();
-        let where_bounds = self.parse_where();
-
-        self.expect(L_BRACE);
-
-        let mut methods = Vec::new();
-
-        while !self.is(R_BRACE) && !self.is_eof() {
-            methods.push(self.parse_element());
-        }
-
-        self.expect(R_BRACE);
-        let green = self.builder.finish_node(TRAIT);
-
-        Arc::new(Trait {
-            id: self.new_node_id(),
-            name,
-            green,
-            modifiers: modifiers.clone(),
-            type_params,
-            where_bounds,
-            span: self.finish_node(),
-            methods,
         })
     }
 
@@ -695,90 +393,6 @@ impl Parser {
             modifiers,
             name: ident,
             data_type: ty,
-        }
-    }
-
-    fn parse_class(&mut self, modifiers: Option<ModifierList>) -> Arc<Class> {
-        self.start_node();
-        self.assert(CLASS_KW);
-
-        let name = self.expect_identifier();
-        let type_params = self.parse_type_params();
-        let where_bounds = self.parse_where();
-
-        let fields = if self.is(L_PAREN) {
-            self.parse_list(
-                L_PAREN,
-                COMMA,
-                R_PAREN,
-                ELEM_FIRST,
-                ParseError::ExpectedField,
-                LIST,
-                |p| {
-                    if p.is_set(FIELD_FIRST) {
-                        Some(p.parse_class_field())
-                    } else {
-                        None
-                    }
-                },
-            )
-        } else if self.is(L_BRACE) {
-            self.parse_list(
-                L_BRACE,
-                COMMA,
-                R_BRACE,
-                ELEM_FIRST,
-                ParseError::ExpectedField,
-                LIST,
-                |p| {
-                    if p.is_set(FIELD_FIRST) {
-                        Some(p.parse_class_field())
-                    } else {
-                        None
-                    }
-                },
-            )
-        } else {
-            Vec::new()
-        };
-
-        let green = self.builder.finish_node(CLASS);
-
-        Arc::new(Class {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            modifiers: modifiers.clone(),
-            name,
-            fields,
-            type_params,
-            where_bounds,
-        })
-    }
-
-    fn parse_class_field(&mut self) -> Field {
-        self.start_node();
-        self.builder.start_node();
-
-        let modifiers = self.parse_modifiers();
-
-        let name = self.expect_identifier();
-
-        self.expect(COLON);
-        let data_type = self.parse_type();
-
-        let green = self.builder.finish_node(CLASS_FIELD);
-
-        Field {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            modifiers,
-            name,
-            data_type,
-            primary_ctor: false,
-            expr: None,
-            mutable: true,
         }
     }
 
@@ -1027,60 +641,6 @@ impl Parser {
         }
     }
 
-    fn parse_where(&mut self) -> Option<WhereBounds> {
-        if self.eat(WHERE_KW) {
-            self.start_node();
-            self.builder.start_node();
-
-            let mut clauses = Vec::new();
-
-            loop {
-                clauses.push(self.parse_where_clause());
-
-                if !self.eat(COMMA) {
-                    break;
-                }
-            }
-
-            let green = self.builder.finish_node(WHERE_CLAUSES);
-
-            Some(Arc::new(WhereBoundsData {
-                id: self.new_node_id(),
-                span: self.finish_node(),
-                green,
-                clauses,
-            }))
-        } else {
-            None
-        }
-    }
-
-    fn parse_where_clause(&mut self) -> WhereClause {
-        self.start_node();
-        self.builder.start_node();
-        let ty = self.parse_type();
-        self.expect(COLON);
-        let mut bounds = Vec::new();
-
-        loop {
-            bounds.push(self.parse_type());
-
-            if !self.eat(ADD) {
-                break;
-            }
-        }
-
-        let green = self.builder.finish_node(WHERE_CLAUSE);
-
-        Arc::new(WhereBoundData {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            ty,
-            bounds,
-        })
-    }
-
     fn parse_function_block(&mut self) -> Option<Expr> {
         if self.eat(SEMICOLON) {
             None
@@ -1154,7 +714,7 @@ impl Parser {
 
                     let green = self.builder.finish_node(LAMBDA_TYPE);
 
-                    Arc::new(TypeData::create_fct(
+                    Arc::new(TypeData::create_function(
                         self.new_node_id(),
                         self.finish_node(),
                         green,
@@ -1212,7 +772,7 @@ impl Parser {
         })
     }
 
-    fn parse_let(&mut self) -> Stmt {
+    fn parse_let(&mut self) -> SpecialForm {
         self.start_node();
 
         self.assert(LET_KW);
@@ -1222,7 +782,7 @@ impl Parser {
 
         self.expect(SEMICOLON);
 
-        Arc::new(StmtData::create_let(
+        Arc::new(SpecialFormData::create_let(
             self.new_node_id(),
             self.finish_node(),
             pattern,
@@ -1294,21 +854,21 @@ impl Parser {
     fn parse_block(&mut self) -> Expr {
         self.start_node();
         self.builder.start_node();
-        let mut stmts = vec![];
+        let mut specials = vec![];
         let mut expr = None;
 
         if self.expect(L_BRACE) {
             while !self.is(R_BRACE) && !self.is_eof() {
-                let stmt_or_expr = self.parse_statement_or_expression();
+                let special_or_expr = self.parse_statement_or_expression();
 
-                match stmt_or_expr {
-                    StmtOrExpr::Stmt(stmt) => stmts.push(stmt),
-                    StmtOrExpr::Expr(curr_expr) => {
+                match special_or_expr {
+                    SpecialFormOrExpr::SpecialForm(special) => specials.push(special),
+                    SpecialFormOrExpr::Expr(curr_expr) => {
                         if curr_expr.needs_semicolon() {
                             expr = Some(curr_expr);
                             break;
                         } else if !self.is(R_BRACE) {
-                            stmts.push(Arc::new(StmtData::create_expr(
+                            specials.push(Arc::new(SpecialFormData::create_expr(
                                 self.new_node_id(),
                                 curr_expr.span(),
                                 curr_expr,
@@ -1329,27 +889,27 @@ impl Parser {
             self.new_node_id(),
             self.finish_node(),
             green,
-            stmts,
+            specials,
             expr,
         ))
     }
 
-    fn parse_statement_or_expression(&mut self) -> StmtOrExpr {
+    fn parse_statement_or_expression(&mut self) -> SpecialFormOrExpr {
         match self.current() {
-            LET_KW => StmtOrExpr::Stmt(self.parse_let()),
+            LET_KW => SpecialFormOrExpr::SpecialForm(self.parse_let()),
             _ => {
                 let expr = self.parse_expression();
 
                 if self.eat(SEMICOLON) {
                     let span = self.span_from(expr.span().start());
 
-                    StmtOrExpr::Stmt(Arc::new(StmtData::create_expr(
+                    SpecialFormOrExpr::SpecialForm(Arc::new(SpecialFormData::create_expr(
                         self.new_node_id(),
                         span,
                         expr,
                     )))
                 } else {
-                    StmtOrExpr::Expr(expr)
+                    SpecialFormOrExpr::Expr(expr)
                 }
             }
         }
@@ -1384,121 +944,6 @@ impl Parser {
             then_block,
             else_block,
         ))
-    }
-
-    fn parse_match(&mut self) -> Expr {
-        self.start_node();
-        self.builder.start_node();
-        self.assert(MATCH_KW);
-
-        let expr = self.parse_expression();
-        let mut cases = Vec::new();
-        let mut comma = true;
-
-        self.expect(L_BRACE);
-
-        while !self.is(R_BRACE) && !self.is_eof() {
-            if !comma {
-                self.report_error(ParseError::ExpectedToken(",".into()));
-            }
-
-            let case = self.parse_match_case();
-            cases.push(case);
-
-            comma = self.eat(COMMA);
-        }
-
-        self.expect(R_BRACE);
-        let green = self.builder.finish_node(MATCH_EXPR);
-
-        Arc::new(ExprData::create_match(
-            self.new_node_id(),
-            self.finish_node(),
-            green,
-            expr,
-            cases,
-        ))
-    }
-
-    fn parse_match_case(&mut self) -> MatchCaseType {
-        self.start_node();
-        let mut patterns = Vec::new();
-        patterns.push(self.parse_match_pattern());
-
-        while self.eat(OR) {
-            patterns.push(self.parse_match_pattern());
-        }
-
-        self.expect(DOUBLE_ARROW);
-
-        let value = self.parse_expression();
-
-        MatchCaseType {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            patterns,
-            value,
-        }
-    }
-
-    fn parse_match_pattern(&mut self) -> MatchPattern {
-        self.start_node();
-
-        let data = if self.eat(UNDERSCORE) {
-            MatchPatternData::Underscore
-        } else {
-            let path = self.parse_path();
-
-            let params = if self.is(L_PAREN) {
-                let params = self.parse_list(
-                    L_PAREN,
-                    COMMA,
-                    R_PAREN,
-                    MATCH_PATTERN_RS,
-                    ParseError::ExpectedPattern,
-                    PATTERN_LIST,
-                    |p| {
-                        if p.is_set(MATCH_PATTERN_FIRST) {
-                            Some(p.parse_match_pattern_param())
-                        } else {
-                            None
-                        }
-                    },
-                );
-
-                Some(params)
-            } else {
-                None
-            };
-
-            MatchPatternData::Ident(MatchPatternIdent { path, params })
-        };
-
-        MatchPattern {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            data,
-        }
-    }
-
-    fn parse_match_pattern_param(&mut self) -> MatchPatternParam {
-        self.start_node();
-
-        let (mutable, name) = if self.eat(UNDERSCORE) {
-            (false, None)
-        } else {
-            let mutable = self.eat(MUT_KW);
-            let ident = self.expect_identifier();
-
-            (mutable, ident)
-        };
-
-        MatchPatternParam {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            mutable,
-            name,
-        }
     }
 
     fn parse_for(&mut self) -> Expr {
@@ -1646,34 +1091,6 @@ impl Parser {
         }
     }
 
-    fn parse_unary_expr(&mut self) -> Expr {
-        match self.current() {
-            SUB | NOT => {
-                self.start_node();
-                self.builder.start_node();
-                let kind = self.current();
-                self.advance();
-                let op = match kind {
-                    SUB => UnOp::Neg,
-                    NOT => UnOp::Not,
-                    _ => unreachable!(),
-                };
-
-                let expr = self.parse_postfix_expr();
-                let green = self.builder.finish_node(UNARY_EXPR);
-                Arc::new(ExprData::create_un(
-                    self.new_node_id(),
-                    self.finish_node(),
-                    green,
-                    op,
-                    expr,
-                ))
-            }
-
-            _ => self.parse_postfix_expr(),
-        }
-    }
-
     fn parse_postfix_expr(&mut self) -> Expr {
         let start = self.current_span().start();
         let marker = self.builder.create_marker();
@@ -1775,53 +1192,15 @@ impl Parser {
         Arc::new(ExprData::create_call(self.new_node_id(), span, left, args))
     }
 
-    fn create_binary(&mut self, kind: TokenKind, start: u32, left: Expr, right: Expr) -> Expr {
-        let op = match kind {
-            EQ => BinOp::Assign,
-            OR_OR => BinOp::Or,
-            AND_AND => BinOp::And,
-            EQ_EQ => BinOp::Cmp(CmpOp::Eq),
-            NOT_EQ => BinOp::Cmp(CmpOp::Ne),
-            LT => BinOp::Cmp(CmpOp::Lt),
-            LE => BinOp::Cmp(CmpOp::Le),
-            GT => BinOp::Cmp(CmpOp::Gt),
-            GE => BinOp::Cmp(CmpOp::Ge),
-            EQ_EQ_EQ => BinOp::Cmp(CmpOp::Is),
-            NOT_EQ_EQ => BinOp::Cmp(CmpOp::IsNot),
-            OR => BinOp::BitOr,
-            AND => BinOp::BitAnd,
-            CARET => BinOp::BitXor,
-            ADD => BinOp::Add,
-            SUB => BinOp::Sub,
-            MUL => BinOp::Mul,
-            DIV => BinOp::Div,
-            MODULO => BinOp::Mod,
-            LT_LT => BinOp::ShiftL,
-            GT_GT => BinOp::ArithShiftR,
-            GT_GT_GT => BinOp::LogicalShiftR,
-            _ => panic!("unimplemented token {:?}", kind),
-        };
-
-        let span = self.span_from(start);
-
-        Arc::new(ExprData::create_bin(
-            self.new_node_id(),
-            span,
-            op,
-            left,
-            right,
-        ))
-    }
-
     fn parse_factor(&mut self) -> Expr {
         let span = self.current_span();
         match self.current() {
             L_PAREN => self.parse_parentheses(),
             L_BRACE => self.parse_block(),
             IF_KW => self.parse_if(),
-            CHAR_LITERAL => self.parse_lit_char(),
-            INT_LITERAL => self.parse_lit_int(),
-            FLOAT_LITERAL => self.parse_lit_float(),
+            CHAR_LITERAL => self.parse_literal_char(),
+            INT_LITERAL => self.parse_literal_int(),
+            FLOAT_LITERAL => self.parse_literal_float(),
             STRING_LITERAL => self.parse_string(),
             TEMPLATE_LITERAL => self.parse_template(),
             IDENTIFIER => self.parse_identifier(),
@@ -1917,14 +1296,14 @@ impl Parser {
         }
     }
 
-    fn parse_lit_char(&mut self) -> Expr {
+    fn parse_literal_char(&mut self) -> Expr {
         let span = self.current_span();
         self.builder.start_node();
         self.assert(CHAR_LITERAL);
         let value = self.source_span(span);
 
         let green = self.builder.finish_node(CHAR_LIT_EXPR);
-        Arc::new(ExprData::create_lit_char(
+        Arc::new(ExprData::create_literal_char(
             self.new_node_id(),
             span,
             green,
@@ -1932,14 +1311,14 @@ impl Parser {
         ))
     }
 
-    fn parse_lit_int(&mut self) -> Expr {
+    fn parse_literal_int(&mut self) -> Expr {
         let span = self.current_span();
         self.builder.start_node();
         self.assert(INT_LITERAL);
         let value = self.source_span(span);
 
         let green = self.builder.finish_node(INT_LIT_EXPR);
-        Arc::new(ExprData::create_lit_int(
+        Arc::new(ExprData::create_literal_int(
             self.new_node_id(),
             span,
             green,
@@ -1947,14 +1326,14 @@ impl Parser {
         ))
     }
 
-    fn parse_lit_float(&mut self) -> Expr {
+    fn parse_literal_float(&mut self) -> Expr {
         let span = self.current_span();
         self.builder.start_node();
         self.assert(FLOAT_LITERAL);
         let value = self.source_span(span);
 
         let green = self.builder.finish_node(FLOAT_LIT_EXPR);
-        Arc::new(ExprData::create_lit_float(
+        Arc::new(ExprData::create_literal_float(
             self.new_node_id(),
             span,
             green,
@@ -1973,7 +1352,7 @@ impl Parser {
         let green = self.builder.finish_node(STRING_LIT_EXPR);
 
         let mut parts: Vec<Expr> = Vec::new();
-        parts.push(Arc::new(ExprData::create_lit_str(
+        parts.push(Arc::new(ExprData::create_literal_str(
             self.new_node_id(),
             span,
             green,
@@ -2001,7 +1380,7 @@ impl Parser {
             self.advance();
             let green = self.builder.finish_node(STRING_LIT_EXPR);
 
-            parts.push(Arc::new(ExprData::create_lit_str(
+            parts.push(Arc::new(ExprData::create_literal_str(
                 self.new_node_id(),
                 span,
                 green,
@@ -2027,7 +1406,7 @@ impl Parser {
 
         let value = self.source_span(span);
         let green = self.builder.finish_node(STRING_LIT_EXPR);
-        Arc::new(ExprData::create_lit_str(
+        Arc::new(ExprData::create_literal_str(
             self.new_node_id(),
             span,
             green,
@@ -2043,7 +1422,11 @@ impl Parser {
         let value = kind == TRUE;
         self.builder.finish_node(BOOL_LIT_EXPR);
 
-        Arc::new(ExprData::create_lit_bool(self.new_node_id(), span, value))
+        Arc::new(ExprData::create_literal_bool(
+            self.new_node_id(),
+            span,
+            value,
+        ))
     }
 
     fn parse_this(&mut self) -> Expr {
@@ -2228,7 +1611,7 @@ impl Parser {
         let mut end_offset = self.offset;
 
         while end_token > start_token {
-            if !self.tokens[end_token].is_trivia() {
+            if !self.tokens[end_token].is_trivial() {
                 break;
             }
 
@@ -2252,22 +1635,6 @@ impl Parser {
 
 fn token_name(kind: TokenKind) -> Option<&'static str> {
     match kind {
-        PACKAGE_KW => Some("package"),
-        IN_KW => Some("in"),
-        EQ => Some("="),
-        COMMA => Some(","),
-        SEMICOLON => Some(";"),
-        DOT => Some("."),
-        COLON => Some(":"),
-        ARROW => Some("->"),
-        DOUBLE_ARROW => Some("=>"),
-        OR => Some("|"),
-        L_PAREN => Some("("),
-        R_PAREN => Some(")"),
-        L_BRACKET => Some("["),
-        R_BRACKET => Some("]"),
-        L_BRACE => Some("{"),
-        R_BRACE => Some("}"),
         _ => None,
     }
 }
@@ -2329,7 +1696,7 @@ mod tests {
         assert_eq!(col, computed_column);
     }
 
-    fn parse_let(code: &'static str) -> Stmt {
+    fn parse_let(code: &'static str) -> SpecialForm {
         let mut parser = Parser::from_string(code);
         let result = parser.parse_let();
         assert!(parser.errors.is_empty());
@@ -2358,7 +1725,7 @@ mod tests {
     fn parse_number() {
         let expr = parse_expr("10");
 
-        let lit = expr.to_lit_int().unwrap();
+        let lit = expr.to_literal_int().unwrap();
         assert_eq!(String::from("10"), lit.value);
     }
 
@@ -2366,7 +1733,7 @@ mod tests {
     fn parse_number_with_underscore() {
         let expr = parse_expr("1____0");
 
-        let lit = expr.to_lit_int().unwrap();
+        let lit = expr.to_literal_int().unwrap();
         assert_eq!(String::from("1____0"), lit.value);
     }
 
@@ -2374,7 +1741,7 @@ mod tests {
     fn parse_string() {
         let expr = parse_expr("\"abc\"");
 
-        let lit = expr.to_lit_str().unwrap();
+        let lit = expr.to_literal_str().unwrap();
         assert_eq!("\"abc\"", &lit.value);
     }
 
@@ -2382,7 +1749,7 @@ mod tests {
     fn parse_true() {
         let expr = parse_expr("true");
 
-        let lit = expr.to_lit_bool().unwrap();
+        let lit = expr.to_literal_bool().unwrap();
         assert_eq!(true, lit.value);
     }
 
@@ -2390,7 +1757,7 @@ mod tests {
     fn parse_false() {
         let expr = parse_expr("true");
 
-        let lit = expr.to_lit_bool().unwrap();
+        let lit = expr.to_literal_bool().unwrap();
         assert_eq!(true, lit.value);
     }
 
@@ -2420,7 +1787,7 @@ mod tests {
         let ident = dot.lhs.to_ident().unwrap();
         assert_eq!("bar", ident.name);
 
-        assert_eq!(String::from("12"), dot.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("12"), dot.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2437,7 +1804,7 @@ mod tests {
         let un = expr.to_un().unwrap();
         assert_eq!(UnOp::Neg, un.op);
 
-        assert!(un.opnd.is_lit_int());
+        assert!(un.opnd.is_literal_int());
     }
 
     #[test]
@@ -2450,7 +1817,7 @@ mod tests {
         let neg2 = neg1.opnd.to_paren().unwrap().expr.to_un().unwrap();
         assert_eq!(UnOp::Neg, neg2.op);
 
-        assert!(neg2.opnd.is_lit_int());
+        assert!(neg2.opnd.is_literal_int());
     }
 
     #[test]
@@ -2464,8 +1831,8 @@ mod tests {
 
         let mul = expr.to_bin().unwrap();
         assert_eq!(BinOp::Mul, mul.op);
-        assert_eq!(String::from("6"), mul.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("3"), mul.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("6"), mul.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("3"), mul.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2477,10 +1844,10 @@ mod tests {
 
         let mul2 = mul1.lhs.to_bin().unwrap();
         assert_eq!(BinOp::Mul, mul2.op);
-        assert_eq!(String::from("6"), mul2.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("3"), mul2.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("6"), mul2.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("3"), mul2.rhs.to_literal_int().unwrap().value);
 
-        assert_eq!(String::from("4"), mul1.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("4"), mul1.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2489,8 +1856,8 @@ mod tests {
 
         let div = expr.to_bin().unwrap();
         assert_eq!(BinOp::Div, div.op);
-        assert_eq!(String::from("4"), div.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("5"), div.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("4"), div.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("5"), div.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2499,8 +1866,8 @@ mod tests {
 
         let div = expr.to_bin().unwrap();
         assert_eq!(BinOp::Mod, div.op);
-        assert_eq!(String::from("2"), div.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("15"), div.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("2"), div.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("15"), div.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2509,8 +1876,8 @@ mod tests {
 
         let add = expr.to_bin().unwrap();
         assert_eq!(BinOp::Add, add.op);
-        assert_eq!(String::from("2"), add.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("3"), add.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("2"), add.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("3"), add.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2518,11 +1885,11 @@ mod tests {
         let expr = parse_expr("1+2+3");
 
         let add = expr.to_bin().unwrap();
-        assert_eq!(String::from("3"), add.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("3"), add.rhs.to_literal_int().unwrap().value);
 
         let lhs = add.lhs.to_bin().unwrap();
-        assert_eq!(String::from("1"), lhs.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), lhs.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), lhs.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), lhs.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2530,11 +1897,11 @@ mod tests {
         let expr = parse_expr("1+(2+3)");
 
         let add = expr.to_bin().unwrap();
-        assert_eq!(String::from("1"), add.lhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), add.lhs.to_literal_int().unwrap().value);
 
         let rhs = add.rhs.to_paren().unwrap().expr.to_bin().unwrap();
-        assert_eq!(String::from("2"), rhs.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("3"), rhs.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("2"), rhs.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("3"), rhs.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2543,8 +1910,8 @@ mod tests {
 
         let add = expr.to_bin().unwrap();
         assert_eq!(BinOp::Sub, add.op);
-        assert_eq!(String::from("1"), add.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), add.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), add.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), add.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2553,8 +1920,8 @@ mod tests {
 
         let add = expr.to_bin().unwrap();
         assert_eq!(BinOp::Or, add.op);
-        assert_eq!(String::from("1"), add.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), add.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), add.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), add.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2563,8 +1930,8 @@ mod tests {
 
         let add = expr.to_bin().unwrap();
         assert_eq!(BinOp::And, add.op);
-        assert_eq!(String::from("1"), add.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), add.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), add.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), add.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2573,8 +1940,8 @@ mod tests {
 
         let or = expr.to_bin().unwrap();
         assert_eq!(BinOp::BitOr, or.op);
-        assert_eq!(String::from("1"), or.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), or.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), or.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), or.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2583,8 +1950,8 @@ mod tests {
 
         let and = expr.to_bin().unwrap();
         assert_eq!(BinOp::BitAnd, and.op);
-        assert_eq!(String::from("1"), and.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), and.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), and.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), and.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2593,8 +1960,8 @@ mod tests {
 
         let xor = expr.to_bin().unwrap();
         assert_eq!(BinOp::BitXor, xor.op);
-        assert_eq!(String::from("1"), xor.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), xor.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), xor.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), xor.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2603,8 +1970,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Lt), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2613,8 +1980,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Le), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2623,8 +1990,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Gt), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2633,8 +2000,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Ge), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2643,8 +2010,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Eq), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2653,8 +2020,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Ne), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2663,8 +2030,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::IsNot), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2673,8 +2040,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Is), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_lit_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_lit_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
     }
 
     #[test]
@@ -2684,7 +2051,10 @@ mod tests {
         let assign = expr.to_bin().unwrap();
         assert!(assign.lhs.is_ident());
         assert_eq!(BinOp::Assign, assign.op);
-        assert_eq!(String::from("4"), assign.rhs.to_lit_int().unwrap().value);
+        assert_eq!(
+            String::from("4"),
+            assign.rhs.to_literal_int().unwrap().value
+        );
     }
 
     #[test]
@@ -2732,20 +2102,20 @@ mod tests {
     #[test]
     fn parse_function() {
         let prog = parse("fn b() { }");
-        let fct = prog.fct0();
+        let function = prog.function0();
 
-        assert_eq!("b", fct.name.as_ref().unwrap().name_as_string);
-        assert_eq!(0, fct.params.len());
-        assert!(fct.return_type.is_none());
+        assert_eq!("b", function.name.as_ref().unwrap().name_as_string);
+        assert_eq!(0, function.params.len());
+        assert!(function.return_type.is_none());
     }
 
     #[test]
     fn parse_function_with_single_param() {
         let p1 = parse("fn f(a:int) { }");
-        let f1 = p1.fct0();
+        let f1 = p1.function0();
 
         let p2 = parse("fn f(a:int,) { }");
-        let f2 = p2.fct0();
+        let f2 = p2.function0();
 
         assert_eq!(f1.params.len(), 1);
         assert_eq!(f2.params.len(), 1);
@@ -2763,10 +2133,10 @@ mod tests {
     #[test]
     fn parse_function_with_multiple_params() {
         let p1 = parse("fn f(a:int, b:str) { }");
-        let f1 = p1.fct0();
+        let f1 = p1.function0();
 
         let p2 = parse("fn f(a:int, b:str,) { }");
-        let f2 = p2.fct0();
+        let f2 = p2.function0();
 
         let p1a = &f1.params[0];
         let p1b = &f1.params[1];
@@ -2788,34 +2158,34 @@ mod tests {
 
     #[test]
     fn parse_let_without_type() {
-        let stmt = parse_let("let a = 1;");
-        let var = stmt.to_let().unwrap();
+        let special = parse_let("let a = 1;");
+        let var = special.to_let().unwrap();
 
         assert!(var.data_type.is_none());
-        assert!(var.expr.as_ref().unwrap().is_lit_int());
+        assert!(var.expr.as_ref().unwrap().is_literal_int());
     }
 
     #[test]
     fn parse_let_with_type() {
-        let stmt = parse_let("let x : int = 1;");
-        let var = stmt.to_let().unwrap();
+        let special = parse_let("let x : int = 1;");
+        let var = special.to_let().unwrap();
 
         assert!(var.data_type.is_some());
-        assert!(var.expr.as_ref().unwrap().is_lit_int());
+        assert!(var.expr.as_ref().unwrap().is_literal_int());
     }
 
     #[test]
     fn parse_let_underscore() {
-        let stmt = parse_let("let _ = 1;");
-        let let_decl = stmt.to_let().unwrap();
+        let special = parse_let("let _ = 1;");
+        let let_decl = special.to_let().unwrap();
 
         assert!(let_decl.pattern.is_underscore());
     }
 
     #[test]
     fn parse_let_tuple() {
-        let stmt = parse_let("let (mut a, b, (c, d)) = 1;");
-        let let_decl = stmt.to_let().unwrap();
+        let special = parse_let("let (mut a, b, (c, d)) = 1;");
+        let let_decl = special.to_let().unwrap();
 
         assert!(let_decl.pattern.is_tuple());
         let tuple = let_decl.pattern.to_tuple().unwrap();
@@ -2827,16 +2197,16 @@ mod tests {
 
     #[test]
     fn parse_let_ident() {
-        let stmt = parse_let("let x = 1;");
-        let let_decl = stmt.to_let().unwrap();
+        let special = parse_let("let x = 1;");
+        let let_decl = special.to_let().unwrap();
 
         assert!(let_decl.pattern.is_ident());
     }
 
     #[test]
     fn parse_let_ident_mut() {
-        let stmt = parse_let("let mut x = 1;");
-        let let_decl = stmt.to_let().unwrap();
+        let special = parse_let("let mut x = 1;");
+        let let_decl = special.to_let().unwrap();
 
         assert!(let_decl.pattern.is_ident());
         assert!(let_decl.pattern.to_ident().unwrap().mutable);
@@ -2844,8 +2214,8 @@ mod tests {
 
     #[test]
     fn parse_let_with_type_but_without_assignment() {
-        let stmt = parse_let("let x : int;");
-        let var = stmt.to_let().unwrap();
+        let special = parse_let("let x : int;");
+        let var = special.to_let().unwrap();
 
         assert!(var.data_type.is_some());
         assert!(var.expr.is_none());
@@ -2853,8 +2223,8 @@ mod tests {
 
     #[test]
     fn parse_let_without_type_and_assignment() {
-        let stmt = parse_let("let x;");
-        let var = stmt.to_let().unwrap();
+        let special = parse_let("let x;");
+        let var = special.to_let().unwrap();
 
         assert!(var.data_type.is_none());
         assert!(var.expr.is_none());
@@ -2864,10 +2234,10 @@ mod tests {
     fn parse_multiple_functions() {
         let prog = parse("fn f() { } fn g() { }");
 
-        let f = prog.fct0();
+        let f = prog.function0();
         assert_eq!("f", f.name.as_ref().unwrap().name_as_string);
 
-        let g = prog.fct(1);
+        let g = prog.function(1);
         assert_eq!("g", g.name.as_ref().unwrap().name_as_string);
     }
 
@@ -2876,7 +2246,7 @@ mod tests {
         let expr = parse_expr("if true { 2; } else { 3; }");
         let ifexpr = expr.to_if().unwrap();
 
-        assert!(ifexpr.cond.is_lit_bool());
+        assert!(ifexpr.cond.is_literal_bool());
         assert!(ifexpr.else_block.is_some());
     }
 
@@ -2885,17 +2255,17 @@ mod tests {
         let expr = parse_expr("if true { 2; }");
         let ifexpr = expr.to_if().unwrap();
 
-        assert!(ifexpr.cond.is_lit_bool());
+        assert!(ifexpr.cond.is_literal_bool());
         assert!(ifexpr.else_block.is_none());
     }
 
     #[test]
     fn parse_while() {
         let expr = parse_expr("while true { 2; }");
-        let whilestmt = expr.to_while().unwrap();
+        let whilespecial = expr.to_while().unwrap();
 
-        assert!(whilestmt.cond.is_lit_bool());
-        assert!(whilestmt.block.is_block());
+        assert!(whilespecial.cond.is_literal_bool());
+        assert!(whilespecial.block.is_block());
     }
 
     #[test]
@@ -2903,37 +2273,37 @@ mod tests {
         let expr = parse_expr("{}");
         let block = expr.to_block().unwrap();
 
-        assert_eq!(0, block.stmts.len());
+        assert_eq!(0, block.specials.len());
     }
 
     #[test]
-    fn parse_block_with_one_stmt() {
+    fn parse_block_with_one_special() {
         let expr = parse_expr("{ 1; 2 }");
         let block = expr.to_block().unwrap();
 
-        assert_eq!(1, block.stmts.len());
+        assert_eq!(1, block.specials.len());
 
-        let expr = &block.stmts[0].to_expr().unwrap().expr;
-        assert_eq!(String::from("1"), expr.to_lit_int().unwrap().value);
+        let expr = &block.specials[0].to_expr().unwrap().expr;
+        assert_eq!(String::from("1"), expr.to_literal_int().unwrap().value);
 
         assert_eq!(
             String::from("2"),
-            block.expr.as_ref().unwrap().to_lit_int().unwrap().value
+            block.expr.as_ref().unwrap().to_literal_int().unwrap().value
         );
     }
 
     #[test]
-    fn parse_block_with_multiple_stmts() {
+    fn parse_block_with_multiple_specials() {
         let expr = parse_expr("{ 1; 2; }");
         let block = expr.to_block().unwrap();
 
-        assert_eq!(2, block.stmts.len());
+        assert_eq!(2, block.specials.len());
 
-        let expr = &block.stmts[0].to_expr().unwrap().expr;
-        assert_eq!(String::from("1"), expr.to_lit_int().unwrap().value);
+        let expr = &block.specials[0].to_expr().unwrap().expr;
+        assert_eq!(String::from("1"), expr.to_literal_int().unwrap().value);
 
-        let expr = &block.stmts[1].to_expr().unwrap().expr;
-        assert_eq!(String::from("2"), expr.to_lit_int().unwrap().value);
+        let expr = &block.specials[1].to_expr().unwrap().expr;
+        assert_eq!(String::from("2"), expr.to_literal_int().unwrap().value);
 
         assert!(block.expr.is_none());
     }
@@ -2957,7 +2327,7 @@ mod tests {
 
         assert_eq!(
             String::from("1"),
-            ret.expr.as_ref().unwrap().to_lit_int().unwrap().value
+            ret.expr.as_ref().unwrap().to_literal_int().unwrap().value
         );
     }
 
@@ -3003,31 +2373,37 @@ mod tests {
     #[test]
     fn parse_type_lambda_no_params() {
         let ty = parse_type("(): ()");
-        let fct = ty.to_fct().unwrap();
+        let function = ty.to_function().unwrap();
 
-        assert_eq!(0, fct.params.len());
-        assert!(fct.ret.as_ref().unwrap().is_unit());
+        assert_eq!(0, function.params.len());
+        assert!(function.ret.as_ref().unwrap().is_unit());
     }
 
     #[test]
     fn parse_type_lambda_one_param() {
         let ty = parse_type("(A): B");
-        let fct = ty.to_fct().unwrap();
+        let function = ty.to_function().unwrap();
 
-        assert_eq!(1, fct.params.len());
-        assert_eq!("A", fct.params[0].to_basic().unwrap().name());
-        assert_eq!("B", fct.ret.as_ref().unwrap().to_basic().unwrap().name());
+        assert_eq!(1, function.params.len());
+        assert_eq!("A", function.params[0].to_basic().unwrap().name());
+        assert_eq!(
+            "B",
+            function.ret.as_ref().unwrap().to_basic().unwrap().name()
+        );
     }
 
     #[test]
     fn parse_type_lambda_two_params() {
         let ty = parse_type("(A, B): C");
-        let fct = ty.to_fct().unwrap();
+        let function = ty.to_function().unwrap();
 
-        assert_eq!(2, fct.params.len());
-        assert_eq!("A", fct.params[0].to_basic().unwrap().name());
-        assert_eq!("B", fct.params[1].to_basic().unwrap().name());
-        assert_eq!("C", fct.ret.as_ref().unwrap().to_basic().unwrap().name());
+        assert_eq!(2, function.params.len());
+        assert_eq!("A", function.params[0].to_basic().unwrap().name());
+        assert_eq!("B", function.params[1].to_basic().unwrap().name());
+        assert_eq!(
+            "C",
+            function.ret.as_ref().unwrap().to_basic().unwrap().name()
+        );
     }
 
     #[test]
@@ -3158,8 +2534,8 @@ mod tests {
     #[test]
     fn parse_function_without_body() {
         let prog = parse("fn foo();");
-        let fct = prog.fct0();
-        assert!(fct.block.is_none());
+        let function = prog.function0();
+        assert!(function.block.is_none());
     }
 
     #[test]
@@ -3219,7 +2595,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_struct_lit_while() {
+    fn parse_struct_literal_while() {
         let expr = parse_expr("while i < n { }");
         let while_expr = expr.to_while().unwrap();
         let bin = while_expr.cond.to_bin().unwrap();
@@ -3229,7 +2605,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_struct_lit_if() {
+    fn parse_struct_literal_if() {
         let expr = parse_expr("if i < n { }");
         let ifexpr = expr.to_if().unwrap();
         let bin = ifexpr.cond.to_bin().unwrap();
@@ -3239,10 +2615,10 @@ mod tests {
     }
 
     #[test]
-    fn parse_lit_float() {
+    fn parse_literal_float() {
         let expr = parse_expr("1.2");
 
-        let lit = expr.to_lit_float().unwrap();
+        let lit = expr.to_literal_float().unwrap();
 
         assert_eq!("1.2", lit.value);
     }
@@ -3255,21 +2631,27 @@ mod tests {
 
         assert_eq!(
             "\"a${".to_string(),
-            tmpl.parts[0].to_lit_str().unwrap().value
+            tmpl.parts[0].to_literal_str().unwrap().value
         );
-        assert_eq!(String::from("1"), tmpl.parts[1].to_lit_int().unwrap().value);
+        assert_eq!(
+            String::from("1"),
+            tmpl.parts[1].to_literal_int().unwrap().value
+        );
         assert_eq!(
             "}b${".to_string(),
-            tmpl.parts[2].to_lit_str().unwrap().value
+            tmpl.parts[2].to_literal_str().unwrap().value
         );
-        assert_eq!(String::from("2"), tmpl.parts[3].to_lit_int().unwrap().value);
+        assert_eq!(
+            String::from("2"),
+            tmpl.parts[3].to_literal_int().unwrap().value
+        );
         assert_eq!(
             "}c\"".to_string(),
-            tmpl.parts[4].to_lit_str().unwrap().value
+            tmpl.parts[4].to_literal_str().unwrap().value
         );
 
         let expr = parse_expr("\"a\\${1}b\"");
-        assert!(expr.is_lit_str());
+        assert!(expr.is_literal_str());
     }
 
     #[test]
@@ -3379,15 +2761,15 @@ mod tests {
     }
 
     #[test]
-    fn parse_lit_char() {
+    fn parse_literal_char() {
         let expr = parse_expr("'a'");
-        let lit = expr.to_lit_char().unwrap();
+        let lit = expr.to_literal_char().unwrap();
 
         assert_eq!("'a'", lit.value);
     }
 
     #[test]
-    fn parse_fct_call_with_type_param() {
+    fn parse_function_call_with_type_param() {
         let expr = parse_expr("Array[Int]()");
         let call = expr.to_call().unwrap();
         let type_params = call.callee.to_type_param().unwrap();
@@ -3422,11 +2804,11 @@ mod tests {
     }
 
     #[test]
-    fn parse_fct_with_type_params() {
+    fn parse_function_with_type_params() {
         let prog = parse("fn f[T]() {}");
-        let fct = prog.fct0();
+        let function = prog.function0();
 
-        assert_eq!(1, fct.type_params.as_ref().unwrap().params.len());
+        assert_eq!(1, function.type_params.as_ref().unwrap().params.len());
     }
 
     #[test]
@@ -3554,7 +2936,13 @@ mod tests {
     #[test]
     fn parse_block() {
         let expr = parse_expr("{1}");
-        assert!(expr.to_block().unwrap().expr.as_ref().unwrap().is_lit_int());
+        assert!(expr
+            .to_block()
+            .unwrap()
+            .expr
+            .as_ref()
+            .unwrap()
+            .is_literal_int());
 
         let expr = parse_expr("({}) + 1");
         assert!(expr.is_bin());

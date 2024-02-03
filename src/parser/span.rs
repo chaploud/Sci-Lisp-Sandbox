@@ -13,10 +13,7 @@ impl Span {
     }
 
     pub fn at(start: u32) -> Span {
-        Span {
-            start: start,
-            len: 0,
-        }
+        Span { start, len: 0 }
     }
 
     pub fn start(&self) -> u32 {

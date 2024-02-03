@@ -19,7 +19,7 @@ pub fn lex(content: &str) -> LexerResult {
     while !lexer.is_eof() {
         let start = lexer.offset();
         let token = lexer.read_token();
-        assert!(token < TokenKind::EOF);
+        assert!(token < TokenKind::Eof);
         let end = lexer.offset();
         tokens.push(token);
         widths.push(end - start);
@@ -82,7 +82,7 @@ impl<'a> Lexer<'a> {
         } else if is_dot(ch) {
             self.read_dot()
         } else if is_pipe(ch) {
-            self.read_pipe() // need semantical analysis (slice 2|-1|1)
+            self.read_pipe() // TODO: need semantical analysis (slice 2|-1|1)
         } else if is_slash(ch) {
             self.read_slash()
         } else if is_and(ch) {
@@ -150,7 +150,7 @@ impl<'a> Lexer<'a> {
             '{' => MapOpen,
             ')' => ListClose,
             ']' => VectorClose,
-            '}' => RBrace, // need semantical analysis (map or set)
+            '}' => RBrace, // TODO: need semantical analysis (map or set)
             _ => {
                 unreachable!()
             }
@@ -364,47 +364,47 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_quote(&mut self) {
+    fn read_quote(&mut self) -> TokenKind {
         self.eat_char();
         Quote
     }
 
-    fn read_syntax_quote(&mut self) {
+    fn read_syntax_quote(&mut self) -> TokenKind {
         self.eat_char();
         SyntaxQuote
     }
 
-    fn read_unquote(&mut self) {
+    fn read_unquote(&mut self) -> TokenKind {
         self.eat_char();
         let next = self.lookahead();
         if let Some('@') = next {
             self.eat_char();
-            UnquoteSplicing
+            return UnquoteSplicing;
         }
         Unquote
     }
 
-    fn read_splicing(&mut self) {
+    fn read_splicing(&mut self) -> TokenKind {
         self.eat_char();
         Splicing
     }
 
-    fn read_dot(&mut self) {
+    fn read_dot(&mut self) -> TokenKind {
         self.eat_char();
         Dot
     }
 
-    fn read_pipe(&mut self) {
+    fn read_pipe(&mut self) -> TokenKind {
         self.eat_char();
         Pipe
     }
 
-    fn read_slash(&mut self) {
+    fn read_slash(&mut self) -> TokenKind {
         self.eat_char();
         Slash
     }
 
-    fn read_and(&mut self) {
+    fn read_and(&mut self) -> TokenKind {
         self.eat_char();
         And
     }
@@ -473,7 +473,6 @@ fn is_digit_or_underscore(ch: Option<char>, base: u32) -> bool {
 
 fn is_whitespace(ch: Option<char>) -> bool {
     ch.map(|ch| ch.is_whitespace() || ch == ',' || ch == '\t' || ch == '\r' || ch == '\n')
-        .unwrap_or(false)
         .unwrap_or(false)
 }
 
