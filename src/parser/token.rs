@@ -56,15 +56,17 @@ pub enum TokenKind {
     ImportKw,
 
     // Mark
+    Underscore,      // _
     Quote,           // '
-    Sharp,           // #
-    Dot,             // .
-    Pipe,            // |
     SyntaxQuote,     // `
     Unquote,         // ~
     UnquoteSplicing, // ~@
+    Splicing,        // @
+    Sharp,           // #
+    Dot,             // .
+    Pipe,            // |
+    Slash,           // /
     And,             // &
-    Underscore,      // _
     RightArrow,      // =>
 
     // brackets
@@ -110,8 +112,6 @@ impl TokenKind {
         self == TokenKind::Eof
     }
 }
-
-use TokenKind::*;
 
 #[derive(Debug, Clone)]
 pub struct TokenSet(u128);

@@ -63,14 +63,30 @@ impl<'a> Lexer<'a> {
             self.read_number(false, self.offset())
         } else if is_sharp(ch) {
             self.read_sharp()
-        } else if is_open(ch) {
-            self.read_collection_open()
+        } else if is_open(ch) || is_close(ch) {
+            self.read_bracket()
         } else if is_symbol_start(ch) {
             self.read_symbol()
         } else if is_colon(ch) {
             self.read_keyword()
         } else if is_double_quote(ch) {
             self.read_string()
+        } else if is_quote(ch) {
+            self.read_quote()
+        } else if is_syntax_quote(ch) {
+            self.read_syntax_quote()
+        } else if is_unquote(ch) {
+            self.read_unquote()
+        } else if is_splicing(ch) {
+            self.read_splicing()
+        } else if is_dot(ch) {
+            self.read_dot()
+        } else if is_pipe(ch) {
+            self.read_pipe() // need semantical analysis (slice 2|-1|1)
+        } else if is_slash(ch) {
+            self.read_slash()
+        } else if is_and(ch) {
+            self.read_and()
         } else {
             self.read_unknown_char()
         }
@@ -111,7 +127,7 @@ impl<'a> Lexer<'a> {
             Some('"') => self.read_regex(start),
             Some('{') => self.read_set_start(),
             _ => {
-                if is_symbol(next) {
+                if is_symbol_start(next) {
                     self.read_type_id()
                 } else {
                     self.report_error_at(
@@ -124,7 +140,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_collection_open(&mut self) -> TokenKind {
+    fn read_bracket(&mut self) -> TokenKind {
         let ch = self.curr().expect("missing char");
         self.eat_char();
 
@@ -132,6 +148,9 @@ impl<'a> Lexer<'a> {
             '(' => ListOpen,
             '[' => VectorOpen,
             '{' => MapOpen,
+            ')' => ListClose,
+            ']' => VectorClose,
+            '}' => RBrace, // need semantical analysis (map or set)
             _ => {
                 unreachable!()
             }
@@ -150,6 +169,8 @@ impl<'a> Lexer<'a> {
             token_type
         } else if value == "_" {
             Underscore
+        } else if value == "=>" {
+            RightArrow
         } else {
             Symbol
         }
@@ -224,18 +245,6 @@ impl<'a> Lexer<'a> {
 
         RegexLiteral
     }
-
-    // TODO:
-    // '
-    // keyword
-    // quoted symbol
-    // quoted vector
-    // quoted map
-    // quoted set
-    // dot
-    // slash
-    // TODO:
-    fn read_quote(&mut self) -> TokenKind {}
 
     fn read_number(&mut self, second_time: bool, start: u32) -> TokenKind {
         if self.curr() == Some('-') {
@@ -349,14 +358,59 @@ impl<'a> Lexer<'a> {
         self.read_number(true, start)
     }
 
-    fn span_from(&self, start: u32) -> Span {
-        Span::new(start, self.offset() - start)
-    }
-
     fn read_digits(&mut self, base: u32) {
         while is_digit_or_underscore(self.curr(), base) {
             self.eat_char();
         }
+    }
+
+    fn read_quote(&mut self) {
+        self.eat_char();
+        Quote
+    }
+
+    fn read_syntax_quote(&mut self) {
+        self.eat_char();
+        SyntaxQuote
+    }
+
+    fn read_unquote(&mut self) {
+        self.eat_char();
+        let next = self.lookahead();
+        if let Some('@') = next {
+            self.eat_char();
+            UnquoteSplicing
+        }
+        Unquote
+    }
+
+    fn read_splicing(&mut self) {
+        self.eat_char();
+        Splicing
+    }
+
+    fn read_dot(&mut self) {
+        self.eat_char();
+        Dot
+    }
+
+    fn read_pipe(&mut self) {
+        self.eat_char();
+        Pipe
+    }
+
+    fn read_slash(&mut self) {
+        self.eat_char();
+        Slash
+    }
+
+    fn read_and(&mut self) {
+        self.eat_char();
+        And
+    }
+
+    fn span_from(&self, start: u32) -> Span {
+        Span::new(start, self.offset() - start)
     }
 
     fn offset(&self) -> u32 {
@@ -436,8 +490,8 @@ fn is_symbol(ch: Option<char>) -> bool {
     is_symbol_start(ch) || is_digit(ch)
 }
 
-fn is_quote(ch: Option<char>) -> bool {
-    ch == Some('\'')
+fn is_semicolon(ch: Option<char>) -> bool {
+    ch == Some(';')
 }
 
 fn is_double_quote(ch: Option<char>) -> bool {
@@ -448,16 +502,28 @@ fn is_newline(ch: Option<char>) -> bool {
     ch == Some('\n')
 }
 
-fn is_semicolon(ch: Option<char>) -> bool {
-    ch == Some(';')
-}
-
 fn is_colon(ch: Option<char>) -> bool {
     ch == Some(':')
 }
 
 fn is_sharp(ch: Option<char>) -> bool {
     ch == Some('#')
+}
+
+fn is_quote(ch: Option<char>) -> bool {
+    ch == Some('\'')
+}
+
+fn is_syntax_quote(ch: Option<char>) -> bool {
+    ch == Some('`')
+}
+
+fn is_unquote(ch: Option<char>) -> bool {
+    ch == Some('~')
+}
+
+fn is_splicing(ch: Option<char>) -> bool {
+    ch == Some('@')
 }
 
 fn is_dot(ch: Option<char>) -> bool {
@@ -474,42 +540,6 @@ fn is_slash(ch: Option<char>) -> bool {
 
 fn is_and(ch: Option<char>) -> bool {
     ch == Some('&')
-}
-
-fn is_syntax_quote(ch: Option<char>) -> bool {
-    ch == Some('`')
-}
-
-fn is_unquote(ch: Option<char>) -> bool {
-    ch == Some('~')
-}
-
-fn is_splicing(ch: Option<char>) -> bool {
-    ch == Some('@')
-}
-
-fn is_open_paren(ch: Option<char>) -> bool {
-    ch == Some('(')
-}
-
-fn is_close_paren(ch: Option<char>) -> bool {
-    ch == Some(')')
-}
-
-fn is_open_bracket(ch: Option<char>) -> bool {
-    ch == Some('[')
-}
-
-fn is_close_bracket(ch: Option<char>) -> bool {
-    ch == Some(']')
-}
-
-fn is_open_brace(ch: Option<char>) -> bool {
-    ch == Some('{')
-}
-
-fn is_close_brace(ch: Option<char>) -> bool {
-    ch == Some('}')
 }
 
 fn is_close(ch: Option<char>) -> bool {
