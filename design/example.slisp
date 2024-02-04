@@ -22,6 +22,30 @@ inf                 ; f64: positive infinity
 ;; falsy value is only 'false' and 'nil'
 ;; "", '(), [], {}, #{}, 0, nan => all truthy"
 
+;; ===== Keywords (cannot use as symbol name)
+;; false, true, nil,
+;; def, const, set!,
+;; defn, fn, return,
+;; if, when, cond, switch,
+;; while, for, break, continue
+;; try, catch, finally, throw,
+;; import
+
+;; ===== Spceial Marks (cannot use in symbol name)
+;; : => keyword
+;; ' => quote
+;; ` => syntax-quote
+;; ~ => unquote
+;; ~@ => unquote-splicing
+;; @ => splicing
+;; . => member access
+;; | => slice
+;; / => namespace(module)
+;; & => rest(variable length argument), keyword argument
+
+;; #i64 => type annotation (prefix)
+;; local# => auto-gensym (suffix)
+
 ;; ===== Collection
 ; comma is treated as whitespace
 '(1, "a", :b)                ; list

@@ -31,12 +31,12 @@ pub fn compute_line_column(line_starts: &[u32], offset: u32) -> (u32, u32) {
     let result = line_starts.binary_search(&offset);
     match result {
         Ok(idx) => {
-            let idx: u32 = idx.try_into().expect("overflow");
+            let idx: u32 = idx.try_i64o().expect("overflow");
             (idx + 1, 1)
         }
         Err(idx) => {
             let line_start = line_starts[idx - 1];
-            (idx.try_into().expect("overflow"), offset - line_start + 1)
+            (idx.try_i64o().expect("overflow"), offset - line_start + 1)
         }
     }
 }
@@ -102,7 +102,7 @@ impl Parser {
 
     fn parse_file(&mut self) -> ast::File {
         self.builder.start_node();
-        self.skip_trivia();
+        self.skip_trivial();
         let mut elements = vec![];
 
         while !self.is_eof() {
@@ -165,7 +165,7 @@ impl Parser {
     fn parse_enum(&mut self, modifiers: Option<ModifierList>) -> Arc<Enum> {
         self.start_node();
         self.assert(ENUM_KW);
-        let name = self.expect_identifier();
+        let name = self.expect_symbol();
         let type_params = self.parse_type_params();
         let where_bounds = self.parse_where();
 
@@ -178,7 +178,7 @@ impl Parser {
                 ParseError::ExpectedEnumVariant,
                 ENUM_VARIANT_LIST,
                 |p| {
-                    if p.is(IDENTIFIER) {
+                    if p.is(Symbol) {
                         Some(p.parse_enum_variant())
                     } else {
                         None
@@ -205,7 +205,7 @@ impl Parser {
     fn parse_enum_variant(&mut self) -> EnumVariant {
         self.start_node();
         self.builder.start_node();
-        let name = self.expect_identifier();
+        let name = self.expect_symbol();
 
         let types = if self.is(L_PAREN) {
             Some(self.parse_list(
@@ -235,7 +235,7 @@ impl Parser {
     fn parse_const(&mut self, modifiers: Option<ModifierList>) -> Arc<Const> {
         self.start_node();
         self.assert(CONST_KW);
-        let name = self.expect_identifier();
+        let name = self.expect_symbol();
         self.expect(COLON);
         let ty = self.parse_type();
         self.expect(EQ);
@@ -260,7 +260,7 @@ impl Parser {
         self.assert(LetKw);
 
         let mutable = self.eat(MUT_KW);
-        let name = self.expect_identifier();
+        let name = self.expect_symbol();
 
         self.expect(COLON);
         let data_type = self.parse_type();
@@ -290,7 +290,7 @@ impl Parser {
     fn parse_type_alias(&mut self, modifiers: Option<ModifierList>) -> Arc<TypeAlias> {
         self.start_node();
         self.assert(TYPE_KW);
-        let name = self.expect_identifier();
+        let name = self.expect_symbol();
         let bounds = if self.eat(COLON) {
             self.parse_type_bounds()
         } else {
@@ -319,7 +319,7 @@ impl Parser {
     fn parse_struct(&mut self, modifiers: Option<ModifierList>) -> Arc<Struct> {
         self.start_node();
         self.assert(STRUCT_KW);
-        let ident = self.expect_identifier();
+        let sym = self.expect_symbol();
         let type_params = self.parse_type_params();
         let where_bounds = self.parse_where();
 
@@ -363,7 +363,7 @@ impl Parser {
 
         Arc::new(Struct {
             id: self.new_node_id(),
-            name: ident,
+            name: sym,
             green,
             modifiers: modifiers.clone(),
             span: self.finish_node(),
@@ -379,7 +379,7 @@ impl Parser {
 
         let modifiers = self.parse_modifiers();
 
-        let ident = self.expect_identifier();
+        let sym = self.expect_symbol();
 
         self.expect(COLON);
         let ty = self.parse_type();
@@ -391,7 +391,7 @@ impl Parser {
             span: self.finish_node(),
             green,
             modifiers,
-            name: ident,
+            name: sym,
             data_type: ty,
         }
     }
@@ -421,7 +421,7 @@ impl Parser {
     }
 
     fn parse_type_param_wrapper(&mut self) -> Option<TypeParam> {
-        if self.is(IDENTIFIER) {
+        if self.is(Symbol) {
             Some(self.parse_type_param())
         } else {
             None
@@ -431,7 +431,7 @@ impl Parser {
     fn parse_type_param(&mut self) -> TypeParam {
         self.start_node();
         self.builder.start_node();
-        let name = self.expect_identifier();
+        let name = self.expect_symbol();
 
         let bounds = if self.eat(COLON) {
             self.parse_type_bounds()
@@ -496,7 +496,7 @@ impl Parser {
             // done
         } else {
             self.assert(AT);
-            self.expect_identifier();
+            self.expect_symbol();
         }
 
         let green = self.builder.finish_node_starting_at(MODIFIER, m);
@@ -511,7 +511,7 @@ impl Parser {
     fn parse_function(&mut self, modifiers: Option<ModifierList>) -> Arc<Function> {
         self.start_node();
         self.assert(FN_KW);
-        let name = self.expect_identifier();
+        let name = self.expect_symbol();
         let type_params = self.parse_type_params();
         let params = self.parse_function_params();
         let return_type = self.parse_function_type();
@@ -603,7 +603,7 @@ impl Parser {
     }
 
     fn parse_function_param_wrapper(&mut self) -> Option<Param> {
-        if self.is(MUT_KW) || self.is(IDENTIFIER) {
+        if self.is(MUT_KW) || self.is(Symbol) {
             Some(self.parse_function_param())
         } else {
             None
@@ -613,7 +613,7 @@ impl Parser {
     fn parse_function_param(&mut self) -> Param {
         self.start_node();
         let mutable = self.eat(MUT_KW);
-        let name = self.expect_identifier();
+        let name = self.expect_symbol();
 
         self.expect(COLON);
 
@@ -651,7 +651,7 @@ impl Parser {
     }
 
     fn parse_type_wrapper(&mut self) -> Option<Type> {
-        if self.is(UPCASE_SELF_KW) || self.is(IDENTIFIER) || self.is(L_PAREN) {
+        if self.is(UPCASE_SELF_KW) || self.is(Symbol) || self.is(L_PAREN) {
             Some(self.parse_type())
         } else {
             None
@@ -668,7 +668,7 @@ impl Parser {
                 Arc::new(TypeData::create_self(self.new_node_id(), span, green))
             }
 
-            IDENTIFIER => {
+            Symbol => {
                 self.start_node();
                 let path = self.parse_path();
 
@@ -748,7 +748,7 @@ impl Parser {
     fn parse_path(&mut self) -> Path {
         self.start_node();
         let mut names = Vec::new();
-        let name = self.expect_identifier();
+        let name = self.expect_symbol();
         if let Some(name) = name {
             names.push(name);
         } else {
@@ -757,7 +757,7 @@ impl Parser {
         }
 
         while self.eat(COLON_COLON) {
-            let name = self.expect_identifier();
+            let name = self.expect_symbol();
             if let Some(name) = name {
                 names.push(name);
             } else {
@@ -822,7 +822,7 @@ impl Parser {
             }))
         } else {
             let mutable = self.eat(MUT_KW);
-            let name = self.expect_identifier();
+            let name = self.expect_symbol();
 
             Box::new(LetPattern::Ident(LetIdentType {
                 id: self.new_node_id(),
@@ -1034,63 +1034,6 @@ impl Parser {
         self.parse_binary_expr(0)
     }
 
-    fn parse_binary_expr(&mut self, precedence: u32) -> Expr {
-        if !self.is_set(EXPRESSION_FIRST) {
-            self.report_error(ParseError::ExpectedExpression);
-            return Arc::new(ExprData::Error {
-                id: self.new_node_id(),
-                span: self.current_span(),
-            });
-        }
-
-        let start = self.current_span().start();
-        let marker = self.builder.create_marker();
-        let mut left = self.parse_unary_expr();
-
-        loop {
-            let right_precedence = match self.current() {
-                EQ => 1,
-                OR_OR => 2,
-                AND_AND => 3,
-                EQ_EQ | NOT_EQ | LT | LE | GT | GE | EQ_EQ_EQ | NOT_EQ_EQ => 4,
-                ADD | SUB | OR | CARET => 5,
-                MUL | DIV | MODULO | AND | LT_LT | GT_GT | GT_GT_GT => 6,
-                AS => 7,
-                _ => {
-                    return left;
-                }
-            };
-
-            if precedence >= right_precedence {
-                return left;
-            }
-
-            let kind = self.current();
-            self.advance();
-
-            left = match kind {
-                AS => {
-                    let right = self.parse_type();
-                    let span = self.span_from(start);
-
-                    self.builder
-                        .finish_node_starting_at(CONV_EXPR, marker.clone());
-
-                    let expr = ExprData::create_conv(self.new_node_id(), span, left, right);
-
-                    Arc::new(expr)
-                }
-
-                _ => {
-                    let right = self.parse_binary_expr(right_precedence);
-                    self.builder
-                        .finish_node_starting_at(BINARY_EXPR, marker.clone());
-                    self.create_binary(kind, start, left, right)
-                }
-            };
-        }
-    }
-
     fn parse_postfix_expr(&mut self) -> Expr {
         let start = self.current_span().start();
         let marker = self.builder.create_marker();
@@ -1198,12 +1141,11 @@ impl Parser {
             L_PAREN => self.parse_parentheses(),
             L_BRACE => self.parse_block(),
             IF_KW => self.parse_if(),
-            CHAR_LITERAL => self.parse_literal_char(),
-            INT_LITERAL => self.parse_literal_int(),
+            INT_LITERAL => self.parse_literal_i64(),
             FLOAT_LITERAL => self.parse_literal_float(),
             STRING_LITERAL => self.parse_string(),
             TEMPLATE_LITERAL => self.parse_template(),
-            IDENTIFIER => self.parse_identifier(),
+            Symbol => self.parse_symbol(),
             TRUE => self.parse_bool_literal(),
             FALSE => self.parse_bool_literal(),
             SELF_KW => self.parse_this(),
@@ -1224,15 +1166,15 @@ impl Parser {
         }
     }
 
-    fn parse_identifier(&mut self) -> Expr {
+    fn parse_symbol(&mut self) -> Expr {
         self.builder.start_node();
-        let ident = self.expect_identifier().expect("identifier expected");
-        let green = self.builder.finish_node(IDENT_EXPR);
-        Arc::new(ExprData::create_ident(
+        let sym = self.expect_symbol().expect("symbol expected");
+        let green = self.builder.finish_node(Sym_EXPR);
+        Arc::new(ExprData::create_sym(
             self.new_node_id(),
-            ident.span,
+            sym.span,
             green,
-            ident.name_as_string.clone(),
+            sym.name_as_string.clone(),
         ))
     }
 
@@ -1296,29 +1238,14 @@ impl Parser {
         }
     }
 
-    fn parse_literal_char(&mut self) -> Expr {
+    fn parse_literal_i64(&mut self) -> Expr {
         let span = self.current_span();
         self.builder.start_node();
-        self.assert(CHAR_LITERAL);
+        self.assert(I64Literal);
         let value = self.source_span(span);
 
-        let green = self.builder.finish_node(CHAR_LIT_EXPR);
-        Arc::new(ExprData::create_literal_char(
-            self.new_node_id(),
-            span,
-            green,
-            value,
-        ))
-    }
-
-    fn parse_literal_int(&mut self) -> Expr {
-        let span = self.current_span();
-        self.builder.start_node();
-        self.assert(INT_LITERAL);
-        let value = self.source_span(span);
-
-        let green = self.builder.finish_node(INT_LIT_EXPR);
-        Arc::new(ExprData::create_literal_int(
+        let green = self.builder.finish_node(I);
+        Arc::new(ExprData::create_literal_i64(
             self.new_node_id(),
             span,
             green,
@@ -1419,8 +1346,8 @@ impl Parser {
         let span = self.current_span();
         let kind = self.current();
         self.assert(kind);
-        let value = kind == TRUE;
-        self.builder.finish_node(BOOL_LIT_EXPR);
+        let value = kind == True;
+        self.builder.finish_node(BoolLiteralExpr);
 
         Arc::new(ExprData::create_literal_bool(
             self.new_node_id(),
@@ -1488,11 +1415,11 @@ impl Parser {
         assert!(self.eat(kind));
     }
 
-    fn expect_identifier(&mut self) -> Option<Ident> {
+    fn expect_symbol(&mut self) -> Option<Ident> {
         let span = self.current_span();
 
-        if self.is(IDENTIFIER) {
-            self.assert(IDENTIFIER);
+        if self.is(Symbol) {
+            self.assert(Symbol);
             let value = self.source_span(span);
 
             Some(Arc::new(IdentData {
@@ -1512,7 +1439,7 @@ impl Parser {
             true
         } else {
             let kind = token_name(kind).expect("missing name");
-            self.report_error(ParseError::ExpectedToken(kind.into()));
+            self.report_error(ParseError::ExpectedToken(kind.i64o()));
             false
         }
     }
@@ -1536,11 +1463,11 @@ impl Parser {
 
     fn advance(&mut self) {
         self.raw_advance();
-        self.skip_trivia();
+        self.skip_trivial();
     }
 
-    fn skip_trivia(&mut self) {
-        while self.current().is_trivia() {
+    fn skip_trivial(&mut self) {
+        while self.current().is_trivial() {
             self.raw_advance();
         }
     }
@@ -1641,7 +1568,12 @@ fn token_name(kind: TokenKind) -> Option<&'static str> {
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_line_column, compute_line_starts};
+    use std::sync::Arc;
+
+    use crate::parser::ast::*;
+    use crate::parser::error::ParseError;
+    use crate::parser::Parser;
+    use crate::parser::{compute_line_column, compute_line_starts};
 
     #[test]
     fn test_line_starts() {
@@ -1662,13 +1594,6 @@ mod tests {
         assert_eq!((3, 2), compute_line_column(&line_starts, 5));
         assert_eq!((3, 3), compute_line_column(&line_starts, 6));
     }
-
-    use crate::ast::*;
-    use std::sync::Arc;
-
-    use crate::error::ParseError;
-    use crate::parser::Parser;
-    use crate::{compute_line_column, compute_line_starts};
 
     fn parse_expr(code: &'static str) -> Expr {
         let mut parser = Parser::from_string(code);
@@ -1715,17 +1640,17 @@ mod tests {
     }
 
     #[test]
-    fn parse_ident() {
+    fn parse_sym() {
         let expr = parse_expr("a");
-        let ident = expr.to_ident().unwrap();
-        assert_eq!("a", ident.name);
+        let sym = expr.to_sym().unwrap();
+        assert_eq!("a", sym.name);
     }
 
     #[test]
     fn parse_number() {
         let expr = parse_expr("10");
 
-        let lit = expr.to_literal_int().unwrap();
+        let lit = expr.to_literal_i64().unwrap();
         assert_eq!(String::from("10"), lit.value);
     }
 
@@ -1733,7 +1658,7 @@ mod tests {
     fn parse_number_with_underscore() {
         let expr = parse_expr("1____0");
 
-        let lit = expr.to_literal_int().unwrap();
+        let lit = expr.to_literal_i64().unwrap();
         assert_eq!(String::from("1____0"), lit.value);
     }
 
@@ -1766,11 +1691,11 @@ mod tests {
         let expr = parse_expr("obj.field");
         let dot = expr.to_dot().unwrap();
 
-        let ident = dot.lhs.to_ident().unwrap();
-        assert_eq!("obj", ident.name);
+        let sym = dot.lhs.to_sym().unwrap();
+        assert_eq!("obj", sym.name);
 
-        let ident = dot.rhs.to_ident().unwrap();
-        assert_eq!("field", ident.name);
+        let sym = dot.rhs.to_sym().unwrap();
+        assert_eq!("field", sym.name);
     }
 
     #[test]
@@ -1780,14 +1705,14 @@ mod tests {
     }
 
     #[test]
-    fn parse_field_non_ident() {
+    fn parse_field_non_sym() {
         let expr = parse_expr("bar.12");
         let dot = expr.to_dot().unwrap();
 
-        let ident = dot.lhs.to_ident().unwrap();
-        assert_eq!("bar", ident.name);
+        let sym = dot.lhs.to_sym().unwrap();
+        assert_eq!("bar", sym.name);
 
-        assert_eq!(String::from("12"), dot.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("12"), dot.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1804,7 +1729,7 @@ mod tests {
         let un = expr.to_un().unwrap();
         assert_eq!(UnOp::Neg, un.op);
 
-        assert!(un.opnd.is_literal_int());
+        assert!(un.opnd.is_literal_i64());
     }
 
     #[test]
@@ -1817,7 +1742,7 @@ mod tests {
         let neg2 = neg1.opnd.to_paren().unwrap().expr.to_un().unwrap();
         assert_eq!(UnOp::Neg, neg2.op);
 
-        assert!(neg2.opnd.is_literal_int());
+        assert!(neg2.opnd.is_literal_i64());
     }
 
     #[test]
@@ -1831,8 +1756,8 @@ mod tests {
 
         let mul = expr.to_bin().unwrap();
         assert_eq!(BinOp::Mul, mul.op);
-        assert_eq!(String::from("6"), mul.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("3"), mul.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("6"), mul.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("3"), mul.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1844,10 +1769,10 @@ mod tests {
 
         let mul2 = mul1.lhs.to_bin().unwrap();
         assert_eq!(BinOp::Mul, mul2.op);
-        assert_eq!(String::from("6"), mul2.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("3"), mul2.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("6"), mul2.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("3"), mul2.rhs.to_literal_i64().unwrap().value);
 
-        assert_eq!(String::from("4"), mul1.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("4"), mul1.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1856,8 +1781,8 @@ mod tests {
 
         let div = expr.to_bin().unwrap();
         assert_eq!(BinOp::Div, div.op);
-        assert_eq!(String::from("4"), div.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("5"), div.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("4"), div.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("5"), div.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1866,8 +1791,8 @@ mod tests {
 
         let div = expr.to_bin().unwrap();
         assert_eq!(BinOp::Mod, div.op);
-        assert_eq!(String::from("2"), div.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("15"), div.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), div.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("15"), div.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1876,8 +1801,8 @@ mod tests {
 
         let add = expr.to_bin().unwrap();
         assert_eq!(BinOp::Add, add.op);
-        assert_eq!(String::from("2"), add.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("3"), add.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), add.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("3"), add.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1885,11 +1810,11 @@ mod tests {
         let expr = parse_expr("1+2+3");
 
         let add = expr.to_bin().unwrap();
-        assert_eq!(String::from("3"), add.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("3"), add.rhs.to_literal_i64().unwrap().value);
 
         let lhs = add.lhs.to_bin().unwrap();
-        assert_eq!(String::from("1"), lhs.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), lhs.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), lhs.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), lhs.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1897,11 +1822,11 @@ mod tests {
         let expr = parse_expr("1+(2+3)");
 
         let add = expr.to_bin().unwrap();
-        assert_eq!(String::from("1"), add.lhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), add.lhs.to_literal_i64().unwrap().value);
 
         let rhs = add.rhs.to_paren().unwrap().expr.to_bin().unwrap();
-        assert_eq!(String::from("2"), rhs.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("3"), rhs.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), rhs.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("3"), rhs.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1910,8 +1835,8 @@ mod tests {
 
         let add = expr.to_bin().unwrap();
         assert_eq!(BinOp::Sub, add.op);
-        assert_eq!(String::from("1"), add.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), add.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), add.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), add.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1920,8 +1845,8 @@ mod tests {
 
         let add = expr.to_bin().unwrap();
         assert_eq!(BinOp::Or, add.op);
-        assert_eq!(String::from("1"), add.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), add.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), add.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), add.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1930,8 +1855,8 @@ mod tests {
 
         let add = expr.to_bin().unwrap();
         assert_eq!(BinOp::And, add.op);
-        assert_eq!(String::from("1"), add.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), add.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), add.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), add.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1940,8 +1865,8 @@ mod tests {
 
         let or = expr.to_bin().unwrap();
         assert_eq!(BinOp::BitOr, or.op);
-        assert_eq!(String::from("1"), or.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), or.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), or.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), or.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1950,8 +1875,8 @@ mod tests {
 
         let and = expr.to_bin().unwrap();
         assert_eq!(BinOp::BitAnd, and.op);
-        assert_eq!(String::from("1"), and.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), and.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), and.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), and.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1960,8 +1885,8 @@ mod tests {
 
         let xor = expr.to_bin().unwrap();
         assert_eq!(BinOp::BitXor, xor.op);
-        assert_eq!(String::from("1"), xor.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), xor.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), xor.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), xor.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1970,8 +1895,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Lt), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1980,8 +1905,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Le), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -1990,8 +1915,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Gt), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -2000,8 +1925,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Ge), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -2010,8 +1935,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Eq), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -2020,8 +1945,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Ne), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -2030,8 +1955,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::IsNot), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -2040,8 +1965,8 @@ mod tests {
 
         let cmp = expr.to_bin().unwrap();
         assert_eq!(BinOp::Cmp(CmpOp::Is), cmp.op);
-        assert_eq!(String::from("1"), cmp.lhs.to_literal_int().unwrap().value);
-        assert_eq!(String::from("2"), cmp.rhs.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), cmp.lhs.to_literal_i64().unwrap().value);
+        assert_eq!(String::from("2"), cmp.rhs.to_literal_i64().unwrap().value);
     }
 
     #[test]
@@ -2049,11 +1974,11 @@ mod tests {
         let expr = parse_expr("a=4");
 
         let assign = expr.to_bin().unwrap();
-        assert!(assign.lhs.is_ident());
+        assert!(assign.lhs.is_sym());
         assert_eq!(BinOp::Assign, assign.op);
         assert_eq!(
             String::from("4"),
-            assign.rhs.to_literal_int().unwrap().value
+            assign.rhs.to_literal_i64().unwrap().value
         );
     }
 
@@ -2086,7 +2011,7 @@ mod tests {
         let expr = parse_expr("fname()");
 
         let call = expr.to_call().unwrap();
-        assert_eq!("fname", call.callee.to_ident().unwrap().name);
+        assert_eq!("fname", call.callee.to_sym().unwrap().name);
         assert_eq!(0, call.args.len());
     }
 
@@ -2095,7 +2020,7 @@ mod tests {
         let expr = parse_expr("fname2(1,2,3)");
 
         let call = expr.to_call().unwrap();
-        assert_eq!("fname2", call.callee.to_ident().unwrap().name);
+        assert_eq!("fname2", call.callee.to_sym().unwrap().name);
         assert_eq!(3, call.args.len());
     }
 
@@ -2111,10 +2036,10 @@ mod tests {
 
     #[test]
     fn parse_function_with_single_param() {
-        let p1 = parse("fn f(a:int) { }");
+        let p1 = parse("fn f(a:i64) { }");
         let f1 = p1.function0();
 
-        let p2 = parse("fn f(a:int,) { }");
+        let p2 = parse("fn f(a:i64,) { }");
         let f2 = p2.function0();
 
         assert_eq!(f1.params.len(), 1);
@@ -2126,16 +2051,16 @@ mod tests {
         assert_eq!("a", p1.name.as_ref().unwrap().name_as_string);
         assert_eq!("a", p2.name.as_ref().unwrap().name_as_string);
 
-        assert_eq!("int", p1.data_type.to_basic().unwrap().name());
-        assert_eq!("int", p2.data_type.to_basic().unwrap().name());
+        assert_eq!("i64", p1.data_type.to_basic().unwrap().name());
+        assert_eq!("i64", p2.data_type.to_basic().unwrap().name());
     }
 
     #[test]
     fn parse_function_with_multiple_params() {
-        let p1 = parse("fn f(a:int, b:str) { }");
+        let p1 = parse("fn f(a:i64, b:str) { }");
         let f1 = p1.function0();
 
-        let p2 = parse("fn f(a:int, b:str,) { }");
+        let p2 = parse("fn f(a:i64, b:str,) { }");
         let f2 = p2.function0();
 
         let p1a = &f1.params[0];
@@ -2149,8 +2074,8 @@ mod tests {
         assert_eq!("b", p1b.name.as_ref().unwrap().name_as_string);
         assert_eq!("b", p2b.name.as_ref().unwrap().name_as_string);
 
-        assert_eq!("int", p1a.data_type.to_basic().unwrap().name());
-        assert_eq!("int", p2a.data_type.to_basic().unwrap().name());
+        assert_eq!("i64", p1a.data_type.to_basic().unwrap().name());
+        assert_eq!("i64", p2a.data_type.to_basic().unwrap().name());
 
         assert_eq!("str", p1b.data_type.to_basic().unwrap().name());
         assert_eq!("str", p2b.data_type.to_basic().unwrap().name());
@@ -2162,16 +2087,16 @@ mod tests {
         let var = special.to_let().unwrap();
 
         assert!(var.data_type.is_none());
-        assert!(var.expr.as_ref().unwrap().is_literal_int());
+        assert!(var.expr.as_ref().unwrap().is_literal_i64());
     }
 
     #[test]
     fn parse_let_with_type() {
-        let special = parse_let("let x : int = 1;");
+        let special = parse_let("let x : i64 = 1;");
         let var = special.to_let().unwrap();
 
         assert!(var.data_type.is_some());
-        assert!(var.expr.as_ref().unwrap().is_literal_int());
+        assert!(var.expr.as_ref().unwrap().is_literal_i64());
     }
 
     #[test]
@@ -2190,31 +2115,31 @@ mod tests {
         assert!(let_decl.pattern.is_tuple());
         let tuple = let_decl.pattern.to_tuple().unwrap();
         let first = tuple.parts.first().unwrap();
-        assert!(first.is_ident());
-        assert!(first.to_ident().unwrap().mutable);
+        assert!(first.is_sym());
+        assert!(first.to_sym().unwrap().mutable);
         assert!(tuple.parts.last().unwrap().is_tuple());
     }
 
     #[test]
-    fn parse_let_ident() {
+    fn parse_let_sym() {
         let special = parse_let("let x = 1;");
         let let_decl = special.to_let().unwrap();
 
-        assert!(let_decl.pattern.is_ident());
+        assert!(let_decl.pattern.is_sym());
     }
 
     #[test]
-    fn parse_let_ident_mut() {
+    fn parse_let_sym_mut() {
         let special = parse_let("let mut x = 1;");
         let let_decl = special.to_let().unwrap();
 
-        assert!(let_decl.pattern.is_ident());
-        assert!(let_decl.pattern.to_ident().unwrap().mutable);
+        assert!(let_decl.pattern.is_sym());
+        assert!(let_decl.pattern.to_sym().unwrap().mutable);
     }
 
     #[test]
     fn parse_let_with_type_but_without_assignment() {
-        let special = parse_let("let x : int;");
+        let special = parse_let("let x : i64;");
         let var = special.to_let().unwrap();
 
         assert!(var.data_type.is_some());
@@ -2284,11 +2209,11 @@ mod tests {
         assert_eq!(1, block.specials.len());
 
         let expr = &block.specials[0].to_expr().unwrap().expr;
-        assert_eq!(String::from("1"), expr.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), expr.to_literal_i64().unwrap().value);
 
         assert_eq!(
             String::from("2"),
-            block.expr.as_ref().unwrap().to_literal_int().unwrap().value
+            block.expr.as_ref().unwrap().to_literal_i64().unwrap().value
         );
     }
 
@@ -2300,10 +2225,10 @@ mod tests {
         assert_eq!(2, block.specials.len());
 
         let expr = &block.specials[0].to_expr().unwrap().expr;
-        assert_eq!(String::from("1"), expr.to_literal_int().unwrap().value);
+        assert_eq!(String::from("1"), expr.to_literal_i64().unwrap().value);
 
         let expr = &block.specials[1].to_expr().unwrap().expr;
-        assert_eq!(String::from("2"), expr.to_literal_int().unwrap().value);
+        assert_eq!(String::from("2"), expr.to_literal_i64().unwrap().value);
 
         assert!(block.expr.is_none());
     }
@@ -2327,7 +2252,7 @@ mod tests {
 
         assert_eq!(
             String::from("1"),
-            ret.expr.as_ref().unwrap().to_literal_int().unwrap().value
+            ret.expr.as_ref().unwrap().to_literal_i64().unwrap().value
         );
     }
 
@@ -2441,14 +2366,14 @@ mod tests {
 
     #[test]
     fn parse_class_with_param() {
-        let prog = parse("class Foo(a: int)");
+        let prog = parse("class Foo(a: i64)");
         let class = prog.cls0();
         assert_eq!(1, class.fields.len());
     }
 
     #[test]
     fn parse_class_with_param_var() {
-        let prog = parse("class Foo(a: int)");
+        let prog = parse("class Foo(a: i64)");
         let class = prog.cls0();
 
         assert_eq!(1, class.fields.len());
@@ -2457,7 +2382,7 @@ mod tests {
 
     #[test]
     fn parse_class_with_params() {
-        let prog = parse("class Foo(a: int, b: int)");
+        let prog = parse("class Foo(a: i64, b: i64)");
         let class = prog.cls0();
 
         assert_eq!(2, class.fields.len());
@@ -2500,14 +2425,14 @@ mod tests {
     fn parse_array_index() {
         let expr = parse_expr("a(b)");
         let call = expr.to_call().unwrap();
-        assert_eq!("a", call.callee.to_ident().unwrap().name);
+        assert_eq!("a", call.callee.to_sym().unwrap().name);
         assert_eq!(1, call.args.len());
-        assert_eq!("b", call.args[0].to_ident().unwrap().name);
+        assert_eq!("b", call.args[0].to_sym().unwrap().name);
     }
 
     #[test]
     fn parse_field() {
-        let prog = parse("class A { f1: int, f2: int }");
+        let prog = parse("class A { f1: i64, f2: i64 }");
         let cls = prog.cls0();
 
         let f1 = &cls.fields[0];
@@ -2523,12 +2448,12 @@ mod tests {
     fn parse_as_expr() {
         let expr = parse_expr("a as String");
         let expr = expr.to_conv().unwrap();
-        assert_eq!(true, expr.object.is_ident());
+        assert_eq!(true, expr.object.is_sym());
     }
 
     #[test]
-    fn parse_internal() {
-        parse("@internal fn foo();");
+    fn parse_i64ernal() {
+        parse("@i64ernal fn foo();");
     }
 
     #[test]
@@ -2600,8 +2525,8 @@ mod tests {
         let while_expr = expr.to_while().unwrap();
         let bin = while_expr.cond.to_bin().unwrap();
 
-        assert!(bin.lhs.is_ident());
-        assert!(bin.rhs.is_ident());
+        assert!(bin.lhs.is_sym());
+        assert!(bin.rhs.is_sym());
     }
 
     #[test]
@@ -2610,8 +2535,8 @@ mod tests {
         let ifexpr = expr.to_if().unwrap();
         let bin = ifexpr.cond.to_bin().unwrap();
 
-        assert!(bin.lhs.is_ident());
-        assert!(bin.rhs.is_ident());
+        assert!(bin.lhs.is_sym());
+        assert!(bin.rhs.is_sym());
     }
 
     #[test]
@@ -2635,7 +2560,7 @@ mod tests {
         );
         assert_eq!(
             String::from("1"),
-            tmpl.parts[1].to_literal_int().unwrap().value
+            tmpl.parts[1].to_literal_i64().unwrap().value
         );
         assert_eq!(
             "}b${".to_string(),
@@ -2643,7 +2568,7 @@ mod tests {
         );
         assert_eq!(
             String::from("2"),
-            tmpl.parts[3].to_literal_int().unwrap().value
+            tmpl.parts[3].to_literal_i64().unwrap().value
         );
         assert_eq!(
             "}c\"".to_string(),
@@ -2753,7 +2678,7 @@ mod tests {
 
     #[test]
     fn parse_global_let() {
-        let prog = parse("let b: int = 0;");
+        let prog = parse("let b: i64 = 0;");
         let global = prog.global0();
 
         assert_eq!("b", global.name.as_ref().unwrap().name_as_string);
@@ -2791,7 +2716,7 @@ mod tests {
         let expr = parse_expr("Vec()");
         let call = expr.to_call().unwrap();
 
-        assert!(call.callee.is_ident());
+        assert!(call.callee.is_sym());
     }
 
     #[test]
@@ -2813,7 +2738,7 @@ mod tests {
 
     #[test]
     fn parse_const() {
-        let prog = parse("const x: int = 0;");
+        let prog = parse("const x: i64 = 0;");
         let const_ = prog.const0();
 
         assert_eq!("x", const_.name.as_ref().unwrap().name_as_string);
@@ -2912,24 +2837,24 @@ mod tests {
     }
 
     #[test]
-    fn parse_new_call_ident() {
+    fn parse_new_call_sym() {
         let expr = parse_expr("i");
-        assert!(expr.is_ident());
+        assert!(expr.is_sym());
     }
 
     #[test]
     fn parse_new_call_path() {
         let expr = parse_expr("Foo::bar");
         let path = expr.to_path().unwrap();
-        assert!(path.lhs.is_ident());
-        assert!(path.rhs.is_ident());
+        assert!(path.lhs.is_sym());
+        assert!(path.rhs.is_sym());
     }
 
     #[test]
     fn parse_new_call_call() {
         let expr = parse_expr("foo(1,2)");
         let call = expr.to_call().unwrap();
-        assert!(call.callee.is_ident());
+        assert!(call.callee.is_sym());
         assert_eq!(call.args.len(), 2);
     }
 
@@ -2942,7 +2867,7 @@ mod tests {
             .expr
             .as_ref()
             .unwrap()
-            .is_literal_int());
+            .is_literal_i64());
 
         let expr = parse_expr("({}) + 1");
         assert!(expr.is_bin());
