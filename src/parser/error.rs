@@ -12,6 +12,7 @@ pub enum ParseError {
 
     // Parser errors
     ExpectedToken(String),
+    UnexpectedToken(String),
 }
 
 impl ParseError {
@@ -29,6 +30,9 @@ impl ParseError {
             // Parser errors
             ParseError::ExpectedToken(ref exp) => {
                 format!("expected `{}`.", exp)
+            }
+            ParseError::UnexpectedToken(ref exp) => {
+                format!("unexpected `{}`.", exp)
             }
         }
     }

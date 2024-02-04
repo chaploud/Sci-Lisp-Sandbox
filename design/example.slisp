@@ -434,12 +434,13 @@ i                            ; => 4 you can access i after loop.
 #s[#f64]                 ; set of f64
 #a[#i64, [2, 3, 4]]      ; 3d-array of i64 (shape is [2, 3, 4])
 #fn[#i64, #i64] => #i64  ; function like (fn [x y] => (+ x y)), x: i64, y: i64, return: i64
-#macro                   ; macro
-#generator               ; generator
+#macro                   ; macro(マクロの型をどうするか)
+#generator[#str]         ; generator
 #datetime                ; datetime
 #duration                ; duration
-#iterable                ; iterable
+#iterable[#i64]          ; iterable
 #collection              ; collection
+#option[#i64]            ; option of i64
 
 ;; ===== User Defined Type
 (enum Color                         ; define enum
@@ -518,6 +519,7 @@ i                            ; => 4 you can access i after loop.
 
 
 ;; 他のモジュールで定義された型の利用
+;; 強力な型推論
 
 ;; Polars binding
 ;; Parallel(thread, coroutine, async)

@@ -101,55 +101,79 @@ impl Parser {
         let mut elements = vec![];
 
         while !self.is_eof() {
-            elements.push(self.parse_element());
+            elements.push(self.parse_expr());
         }
 
         let green = self.builder.finish_node(SourceFile);
         ast::File { green, elements }
     }
 
-    fn parse_element(&mut self) -> Elem {
+    fn parse_expr(&mut self) -> Expr {
         self.builder.start_node();
-        let modifiers = self.parse_modifiers();
         match self.current() {
-            FnKw => {
-                let function = self.parse_function(modifiers);
-                Arc::new(ElemData::Function(function))
+            StringLiteral => {
+                let string = self.parse_string();
+                Arc::new(ExprData::String(string))
             }
-
-            StructKw => {
-                let struc = self.parse_struct(modifiers);
-                Arc::new(ElemData::Struct(struc))
+            RegexLiteral => {
+                let regex = self.parse_regex();
+                Arc::new(ExprData::Regex(regex))
             }
-
-            LetKw => {
-                let global = self.parse_global(modifiers);
-                Arc::new(ElemData::Global(global))
+            BoolLiteral => {
+                let boolean = self.parse_bool();
+                Arc::new(ExprData::Bool(boolean))
             }
-
-            ConstKw => {
-                let const_ = self.parse_const(modifiers);
-                Arc::new(ElemData::Const(const_))
+            NilLiteral => {
+                let nil = self.parse_nil();
+                Arc::new(ExprData::Nil(nil))
             }
-
-            EnumKw => {
-                let enum_ = self.parse_enum(modifiers);
-                Arc::new(ElemData::Enum(enum_))
+            I64Literal => {
+                let i_64 = self.parse_i64();
+                Arc::new(ExprData::I64(i_64))
             }
-
-            TypeKw => {
-                let type_alias = self.parse_type_alias(modifiers);
-                Arc::new(ElemData::TypeAlias(type_alias))
+            F64Literal => {
+                let f_64 = self.parse_c64();
+                Arc::new(ExprData::F64(f_64))
             }
-
-            _ => {
-                assert!(!ELEM_FIRST.contains(self.current()));
+            C64Literal => {
+                let c_64 = self.parse_c64();
+                Arc::new(ExprData::C64(c_64))
+            }
+            KeywordLiteral => {
+                let keyword = self.parse_keyword();
+                Arc::new(ExprData::Keyword(keyword))
+            }
+            Symbol => {
+                let symbol = self.parse_symbol();
+                Arc::new(ExprData::Symbol(symbol))
+            }
+            TypeAnnotation => {
+                let ty = self.parse_type_annotation();
+                Arc::new(ExprData::TypeAnnotation(ty))
+            }
+            ListOpen => {
+                let list = self.parse_list();
+                Arc::new(ExprData::List(list))
+            }
+            VectorOpen => {
+                let vector = self.parse_vector();
+                Arc::new(ExprData::Vector(vector))
+            }
+            MapOpen => {
+                let map = self.parse_map();
+                Arc::new(ExprData::Map(map))
+            }
+            SetOpen => {
+                let set = self.parse_set();
+                Arc::new(ExprData::Set(set))
+            }
+            other => {
                 let span = self.current_span();
-                self.report_error_at(ParseError::ExpectedElement, span);
+                self.report_error_at(ParseError::UnexpectedToken(other), span);
                 self.advance();
                 self.builder.finish_node(Error);
 
-                Arc::new(ElemData::Error {
+                Arc::new(ExprData::Error {
                     id: self.new_node_id(),
                     span,
                 })
@@ -157,734 +181,21 @@ impl Parser {
         }
     }
 
-    fn parse_enum(&mut self, modifiers: Option<ModifierList>) -> Arc<Enum> {
-        self.start_node();
-        self.assert(ENUM_KW);
-        let name = self.expect_symbol();
-        let type_params = self.parse_type_params();
-        let where_bounds = self.parse_where();
-
-        let variants = if self.is(L_BRACE) {
-            self.parse_list(
-                L_BRACE,
-                COMMA,
-                R_BRACE,
-                ENUM_VARIANT_RS,
-                ParseError::ExpectedEnumVariant,
-                ENUM_VARIANT_LIST,
-                |p| {
-                    if p.is(Symbol) {
-                        Some(p.parse_enum_variant())
-                    } else {
-                        None
-                    }
-                },
-            )
-        } else {
-            self.report_error(ParseError::ExpectedEnumVariants);
-            Vec::new()
-        };
-        let green = self.builder.finish_node(ENUM);
-
-        Arc::new(Enum {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            modifiers: modifiers.clone(),
-            name,
-            type_params,
-            variants,
-        })
-    }
-
-    fn parse_enum_variant(&mut self) -> EnumVariant {
-        self.start_node();
-        self.builder.start_node();
-        let name = self.expect_symbol();
-
-        let types = if self.is(L_PAREN) {
-            Some(self.parse_list(
-                L_PAREN,
-                COMMA,
-                R_PAREN,
-                ENUM_VARIANT_ARGUMENT_RS,
-                ParseError::ExpectedType,
-                ENUM_VARIANT_ARGUMENT_LIST,
-                |p| p.parse_type_wrapper(),
-            ))
-        } else {
-            None
-        };
-
-        let green = self.builder.finish_node(ENUM_VARIANT);
-
-        EnumVariant {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            name,
-            types,
-        }
-    }
-
-    fn parse_const(&mut self, modifiers: Option<ModifierList>) -> Arc<Const> {
-        self.start_node();
-        self.assert(CONST_KW);
-        let name = self.expect_symbol();
-        self.expect(COLON);
-        let ty = self.parse_type();
-        self.expect(EQ);
-        let expr = self.parse_expression();
-        self.expect(SEMICOLON);
-
-        let green = self.builder.finish_node(CONST);
-
-        Arc::new(Const {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            modifiers: modifiers.clone(),
-            name,
-            data_type: ty,
-            expr,
-        })
-    }
-
-    fn parse_global(&mut self, modifiers: Option<ModifierList>) -> Arc<Global> {
-        self.start_node();
-        self.assert(LetKw);
-
-        let mutable = self.eat(MUT_KW);
-        let name = self.expect_symbol();
-
-        self.expect(COLON);
-        let data_type = self.parse_type();
-
-        let expr = if self.eat(EQ) {
-            Some(self.parse_expression())
-        } else {
-            None
-        };
-
-        self.expect(SEMICOLON);
-
-        let green = self.builder.finish_node(GLOBAL);
-
-        Arc::new(Global {
-            id: self.new_node_id(),
-            name,
-            green,
-            modifiers: modifiers.clone(),
-            span: self.finish_node(),
-            data_type,
-            mutable,
-            initial_value: expr.clone(),
-        })
-    }
-
-    fn parse_type_alias(&mut self, modifiers: Option<ModifierList>) -> Arc<TypeAlias> {
-        self.start_node();
-        self.assert(TYPE_KW);
-        let name = self.expect_symbol();
-        let bounds = if self.eat(COLON) {
-            self.parse_type_bounds()
-        } else {
-            Vec::new()
-        };
-        let ty = if self.eat(EQ) {
-            Some(self.parse_type())
-        } else {
-            None
-        };
-        self.expect(SEMICOLON);
-
-        let green = self.builder.finish_node(TYPE_ALIAS);
-
-        Arc::new(TypeAlias {
-            id: self.new_node_id(),
-            green,
-            span: self.finish_node(),
-            modifiers,
-            name,
-            bounds,
-            ty,
-        })
-    }
-
-    fn parse_struct(&mut self, modifiers: Option<ModifierList>) -> Arc<Struct> {
-        self.start_node();
-        self.assert(STRUCT_KW);
-        let sym = self.expect_symbol();
-        let type_params = self.parse_type_params();
-        let where_bounds = self.parse_where();
-
-        let fields = if self.is(L_PAREN) {
-            self.parse_list(
-                L_PAREN,
-                COMMA,
-                R_PAREN,
-                ELEM_FIRST,
-                ParseError::ExpectedField,
-                LIST,
-                |p| {
-                    if p.is_set(FIELD_FIRST) {
-                        Some(p.parse_struct_field())
-                    } else {
-                        None
-                    }
-                },
-            )
-        } else if self.is(L_BRACE) {
-            self.parse_list(
-                L_BRACE,
-                COMMA,
-                R_BRACE,
-                ELEM_FIRST,
-                ParseError::ExpectedField,
-                LIST,
-                |p| {
-                    if p.is_set(FIELD_FIRST) {
-                        Some(p.parse_struct_field())
-                    } else {
-                        None
-                    }
-                },
-            )
-        } else {
-            Vec::new()
-        };
-
-        let green = self.builder.finish_node(STRUCT);
-
-        Arc::new(Struct {
-            id: self.new_node_id(),
-            name: sym,
-            green,
-            modifiers: modifiers.clone(),
-            span: self.finish_node(),
-            fields,
-            type_params,
-            where_bounds,
-        })
-    }
-
-    fn parse_struct_field(&mut self) -> StructField {
-        self.start_node();
+    fn parse_string(&mut self) -> Expr {
+        let span = self.current_span();
         self.builder.start_node();
 
-        let modifiers = self.parse_modifiers();
-
-        let sym = self.expect_symbol();
-
-        self.expect(COLON);
-        let ty = self.parse_type();
-
-        let green = self.builder.finish_node(STRUCT_FIELD);
-
-        StructField {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-            modifiers,
-            name: sym,
-            data_type: ty,
-        }
-    }
-
-    fn parse_type_params(&mut self) -> Option<TypeParams> {
-        if self.is(L_BRACKET) {
-            self.builder.start_node();
-            self.start_node();
-            let params = self.parse_list(
-                L_BRACKET,
-                COMMA,
-                R_BRACKET,
-                TYPE_PARAM_RS,
-                ParseError::ExpectedTypeParam,
-                TYPE_PARAMS,
-                |p| p.parse_type_param_wrapper(),
-            );
-            self.builder.finish_node(TYPE_PARAMS);
-
-            Some(TypeParams {
-                span: self.finish_node(),
-                params,
-            })
-        } else {
-            None
-        }
-    }
-
-    fn parse_type_param_wrapper(&mut self) -> Option<TypeParam> {
-        if self.is(Symbol) {
-            Some(self.parse_type_param())
-        } else {
-            None
-        }
-    }
-
-    fn parse_type_param(&mut self) -> TypeParam {
-        self.start_node();
-        self.builder.start_node();
-        let name = self.expect_symbol();
-
-        let bounds = if self.eat(COLON) {
-            self.parse_type_bounds()
-        } else {
-            Vec::new()
-        };
-
-        self.builder.finish_node(TYPE_PARAM);
-
-        TypeParam {
-            name,
-            span: self.finish_node(),
-            bounds,
-        }
-    }
-
-    fn parse_type_bounds(&mut self) -> Vec<Type> {
-        let mut bounds = Vec::new();
-
-        loop {
-            bounds.push(self.parse_type());
-
-            if !self.eat(ADD) {
-                break;
-            }
-        }
-
-        bounds
-    }
-
-    fn parse_modifier(&mut self) -> Modifier {
-        self.start_node();
-        let m = self.builder.create_marker();
-
-        if self.eat(PUB_KW) {
-            // done
-        } else if self.eat(STATIC_KW) {
-            // done
-        } else {
-            self.assert(AT);
-            self.expect_symbol();
-        }
-
-        let green = self.builder.finish_node_starting_at(MODIFIER, m);
-
-        Modifier {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            green,
-        }
-    }
-
-    fn parse_function(&mut self, modifiers: Option<ModifierList>) -> Arc<Function> {
-        self.start_node();
-        self.assert(FN_KW);
-        let name = self.expect_symbol();
-        let type_params = self.parse_type_params();
-        let params = self.parse_function_params();
-        let return_type = self.parse_function_type();
-        let where_bounds = self.parse_where();
-        let block = self.parse_function_block();
-
-        let green = self.builder.finish_node(FN);
-
-        Arc::new(Function {
-            id: self.new_node_id(),
-            kind: FunctionKind::Function,
-            modifiers: modifiers.clone(),
-            name,
-            span: self.finish_node(),
-            params,
-            return_type,
-            block,
-            type_params,
-            where_bounds,
-            green,
-        })
-    }
-
-    fn parse_function_params(&mut self) -> Vec<Param> {
-        if self.is(L_PAREN) {
-            self.parse_list(
-                L_PAREN,
-                COMMA,
-                R_PAREN,
-                PARAM_LIST_RS,
-                ParseError::ExpectedParam,
-                PARAM_LIST,
-                |p| p.parse_function_param_wrapper(),
-            )
-        } else {
-            self.report_error(ParseError::ExpectedParams);
-            Vec::new()
-        }
-    }
-
-    fn parse_list<F, R>(
-        &mut self,
-        start: TokenKind,
-        sep: TokenKind,
-        stop: TokenKind,
-        recovery_set: TokenSet,
-        msg: ParseError,
-        node: TokenKind,
-        mut parse: F,
-    ) -> Vec<R>
-    where
-        F: FnMut(&mut Parser) -> Option<R>,
-    {
-        let mut data = vec![];
-        self.builder.start_node();
-        self.assert(start);
-
-        while !self.is(stop.clone()) && !self.is_eof() {
-            let pos_before_element = self.token_idx;
-            let entry = parse(self);
-
-            match entry {
-                Some(entry) => {
-                    // Callback needs to at least advance by one token, otherwise
-                    // we might loop forever here.
-                    assert!(self.token_idx > pos_before_element);
-                    data.push(entry)
-                }
-
-                None => {
-                    if self.is_set(recovery_set) {
-                        break;
-                    }
-
-                    self.report_error(msg.clone());
-                    self.advance();
-                }
-            }
-
-            if !self.is(stop.clone()) {
-                self.expect(sep);
-            }
-        }
-
-        self.expect(stop);
-        self.builder.finish_node(node);
-
-        data
-    }
-
-    fn parse_function_param_wrapper(&mut self) -> Option<Param> {
-        if self.is(MUT_KW) || self.is(Symbol) {
-            Some(self.parse_function_param())
-        } else {
-            None
-        }
-    }
-
-    fn parse_function_param(&mut self) -> Param {
-        self.start_node();
-        let mutable = self.eat(MUT_KW);
-        let name = self.expect_symbol();
-
-        self.expect(COLON);
-
-        let data_type = self.parse_type();
-
-        let variadic = self.eat(DOT_DOT_DOT);
-
-        Param {
-            id: self.new_node_id(),
-            variadic,
-            name,
-            span: self.finish_node(),
-            mutable,
-            data_type,
-        }
-    }
-
-    fn parse_function_type(&mut self) -> Option<Type> {
-        if self.eat(COLON) {
-            let ty = self.parse_type();
-
-            Some(ty)
-        } else {
-            None
-        }
-    }
-
-    fn parse_function_block(&mut self) -> Option<Expr> {
-        if self.eat(SEMICOLON) {
-            None
-        } else {
-            let block = self.parse_block();
-            Some(block)
-        }
-    }
-
-    fn parse_type_wrapper(&mut self) -> Option<Type> {
-        if self.is(UPCASE_SELF_KW) || self.is(Symbol) || self.is(L_PAREN) {
-            Some(self.parse_type())
-        } else {
-            None
-        }
-    }
-
-    fn parse_type(&mut self) -> Type {
-        self.builder.start_node();
-        match self.current() {
-            UPCASE_SELF_KW => {
-                let span = self.current_span();
-                self.assert(UPCASE_SELF_KW);
-                let green = self.builder.finish_node(SELF_TYPE);
-                Arc::new(TypeData::create_self(self.new_node_id(), span, green))
-            }
-
-            Symbol => {
-                self.start_node();
-                let path = self.parse_path();
-
-                let params = if self.is(L_BRACKET) {
-                    self.parse_list(
-                        L_BRACKET,
-                        COMMA,
-                        R_BRACKET,
-                        TYPE_PARAM_RS,
-                        ParseError::ExpectedType,
-                        LIST,
-                        |p| p.parse_type_wrapper(),
-                    )
-                } else {
-                    Vec::new()
-                };
-
-                let green = self.builder.finish_node(REGULAR_TYPE);
-
-                Arc::new(TypeData::create_basic(
-                    self.new_node_id(),
-                    self.finish_node(),
-                    green,
-                    path,
-                    params,
-                ))
-            }
-
-            L_PAREN => {
-                self.start_node();
-                let subtypes = self.parse_list(
-                    L_PAREN,
-                    COMMA,
-                    R_PAREN,
-                    TYPE_PARAM_RS,
-                    ParseError::ExpectedType,
-                    LIST,
-                    |p| p.parse_type_wrapper(),
-                );
-
-                if self.eat(COLON) {
-                    let ret = self.parse_type();
-
-                    let green = self.builder.finish_node(LAMBDA_TYPE);
-
-                    Arc::new(TypeData::create_function(
-                        self.new_node_id(),
-                        self.finish_node(),
-                        green,
-                        subtypes,
-                        Some(ret),
-                    ))
-                } else {
-                    let green = self.builder.finish_node(TUPLE_TYPE);
-
-                    Arc::new(TypeData::create_tuple(
-                        self.new_node_id(),
-                        self.finish_node(),
-                        green,
-                        subtypes,
-                    ))
-                }
-            }
-
-            _ => {
-                let span = self.current_span();
-                self.report_error(ParseError::ExpectedType);
-                self.builder.abandon_node();
-                Arc::new(TypeData::Error {
-                    id: self.new_node_id(),
-                    span,
-                })
-            }
-        }
-    }
-
-    fn parse_path(&mut self) -> Path {
-        self.start_node();
-        let mut names = Vec::new();
-        let name = self.expect_symbol();
-        if let Some(name) = name {
-            names.push(name);
-        } else {
-            // Advance by token to avoid infinite loop in `parse_match`.
-            self.advance();
-        }
-
-        while self.eat(COLON_COLON) {
-            let name = self.expect_symbol();
-            if let Some(name) = name {
-                names.push(name);
-            } else {
-                break;
-            }
-        }
-
-        Arc::new(PathData {
-            id: self.new_node_id(),
-            span: self.finish_node(),
-            names,
-        })
-    }
-
-    fn parse_let(&mut self) -> SpecialForm {
-        self.start_node();
-
-        self.assert(LET_KW);
-        let pattern = self.parse_let_pattern();
-        let data_type = self.parse_var_type();
-        let expr = self.parse_var_assignment();
-
-        self.expect(SEMICOLON);
-
-        Arc::new(SpecialFormData::create_let(
+        let value = self.source_span(span);
+        let green = self.builder.finish_node(StringLiteral);
+        Arc::new(ExprData::create_literal_str(
             self.new_node_id(),
-            self.finish_node(),
-            pattern,
-            data_type,
-            expr,
+            span,
+            green,
+            value,
         ))
     }
 
-    fn parse_let_pattern(&mut self) -> Box<LetPattern> {
-        self.start_node();
-        if self.is(L_PAREN) {
-            let parts = self.parse_list(
-                L_PAREN,
-                COMMA,
-                R_PAREN,
-                LET_PATTERN_RS,
-                ParseError::ExpectedPattern,
-                PATTERN_LIST,
-                |p| {
-                    if p.is_set(LET_PATTERN_FIRST) {
-                        Some(p.parse_let_pattern())
-                    } else {
-                        None
-                    }
-                },
-            );
-
-            Box::new(LetPattern::Tuple(LetTupleType {
-                id: self.new_node_id(),
-                span: self.finish_node(),
-                parts,
-            }))
-        } else if self.eat(UNDERSCORE) {
-            Box::new(LetPattern::Underscore(LetUnderscoreType {
-                id: self.new_node_id(),
-                span: self.finish_node(),
-            }))
-        } else {
-            let mutable = self.eat(MUT_KW);
-            let name = self.expect_symbol();
-
-            Box::new(LetPattern::Ident(LetIdentType {
-                id: self.new_node_id(),
-                span: self.finish_node(),
-                mutable,
-                name,
-            }))
-        }
-    }
-
-    fn parse_var_type(&mut self) -> Option<Type> {
-        if self.eat(COLON) {
-            Some(self.parse_type())
-        } else {
-            None
-        }
-    }
-
-    fn parse_var_assignment(&mut self) -> Option<Expr> {
-        if self.eat(EQ) {
-            let expr = self.parse_expression();
-
-            Some(expr)
-        } else {
-            None
-        }
-    }
-
-    fn parse_block(&mut self) -> Expr {
-        self.start_node();
-        self.builder.start_node();
-        let mut specials = vec![];
-        let mut expr = None;
-
-        if self.expect(L_BRACE) {
-            while !self.is(R_BRACE) && !self.is_eof() {
-                let special_or_expr = self.parse_statement_or_expression();
-
-                match special_or_expr {
-                    SpecialFormOrExpr::SpecialForm(special) => specials.push(special),
-                    SpecialFormOrExpr::Expr(curr_expr) => {
-                        if curr_expr.needs_semicolon() {
-                            expr = Some(curr_expr);
-                            break;
-                        } else if !self.is(R_BRACE) {
-                            specials.push(Arc::new(SpecialFormData::create_expr(
-                                self.new_node_id(),
-                                curr_expr.span(),
-                                curr_expr,
-                            )));
-                        } else {
-                            expr = Some(curr_expr);
-                        }
-                    }
-                }
-            }
-
-            self.expect(R_BRACE);
-        }
-
-        let green = self.builder.finish_node(BLOCK_EXPR);
-
-        Arc::new(ExprData::create_block(
-            self.new_node_id(),
-            self.finish_node(),
-            green,
-            specials,
-            expr,
-        ))
-    }
-
-    fn parse_statement_or_expression(&mut self) -> SpecialFormOrExpr {
-        match self.current() {
-            LET_KW => SpecialFormOrExpr::SpecialForm(self.parse_let()),
-            _ => {
-                let expr = self.parse_expression();
-
-                if self.eat(SEMICOLON) {
-                    let span = self.span_from(expr.span().start());
-
-                    SpecialFormOrExpr::SpecialForm(Arc::new(SpecialFormData::create_expr(
-                        self.new_node_id(),
-                        span,
-                        expr,
-                    )))
-                } else {
-                    SpecialFormOrExpr::Expr(expr)
-                }
-            }
-        }
-    }
+    fn parse_
 
     fn parse_if(&mut self) -> Expr {
         self.start_node();
@@ -1001,142 +312,6 @@ impl Parser {
         ))
     }
 
-    fn parse_expression(&mut self) -> Expr {
-        self.parse_binary_expr(0)
-    }
-
-    fn parse_postfix_expr(&mut self) -> Expr {
-        let start = self.current_span().start();
-        let marker = self.builder.create_marker();
-        let mut left = self.parse_factor();
-
-        loop {
-            left = match self.current() {
-                DOT => {
-                    let op_span = self.current_span();
-                    self.assert(DOT);
-                    let rhs = self.parse_factor();
-                    let span = self.span_from(start);
-
-                    self.builder
-                        .finish_node_starting_at(POSTFIX_EXPR, marker.clone());
-
-                    Arc::new(ExprData::create_dot(
-                        self.new_node_id(),
-                        span,
-                        op_span,
-                        left,
-                        rhs,
-                    ))
-                }
-
-                L_PAREN => self.parse_call(start, marker.clone(), left),
-
-                L_BRACKET => {
-                    let op_span = self.current_span();
-                    let types = self.parse_list(
-                        L_BRACKET,
-                        COMMA,
-                        R_BRACKET,
-                        TYPE_PARAM_RS,
-                        ParseError::ExpectedType,
-                        TYPE_LIST,
-                        |p| p.parse_type_wrapper(),
-                    );
-                    let span = self.span_from(start);
-
-                    self.builder
-                        .finish_node_starting_at(POSTFIX_EXPR, marker.clone());
-
-                    Arc::new(ExprData::create_type_param(
-                        self.new_node_id(),
-                        span,
-                        op_span,
-                        left,
-                        types,
-                    ))
-                }
-
-                COLON_COLON => {
-                    let op_span = self.current_span();
-                    self.assert(COLON_COLON);
-                    let rhs = self.parse_factor();
-                    let span = self.span_from(start);
-
-                    self.builder
-                        .finish_node_starting_at(POSTFIX_EXPR, marker.clone());
-
-                    Arc::new(ExprData::create_path(
-                        self.new_node_id(),
-                        span,
-                        op_span,
-                        left,
-                        rhs,
-                    ))
-                }
-
-                _ => {
-                    return left;
-                }
-            }
-        }
-    }
-
-    fn parse_call(&mut self, start: u32, marker: Marker, left: Expr) -> Expr {
-        let args = self.parse_list(
-            L_PAREN,
-            COMMA,
-            R_PAREN,
-            EMPTY,
-            ParseError::ExpectedExpression,
-            ARG_LIST,
-            |p| {
-                if p.is_set(EXPRESSION_FIRST) {
-                    Some(p.parse_expression())
-                } else {
-                    None
-                }
-            },
-        );
-        let span = self.span_from(start);
-
-        self.builder
-            .finish_node_starting_at(POSTFIX_EXPR, marker.clone());
-
-        Arc::new(ExprData::create_call(self.new_node_id(), span, left, args))
-    }
-
-    fn parse_factor(&mut self) -> Expr {
-        let span = self.current_span();
-        match self.current() {
-            L_PAREN => self.parse_parentheses(),
-            L_BRACE => self.parse_block(),
-            IF_KW => self.parse_if(),
-            INT_LITERAL => self.parse_literal_i64(),
-            FLOAT_LITERAL => self.parse_literal_float(),
-            STRING_LITERAL => self.parse_string(),
-            TEMPLATE_LITERAL => self.parse_template(),
-            Symbol => self.parse_symbol(),
-            TRUE => self.parse_bool_literal(),
-            FALSE => self.parse_bool_literal(),
-            SELF_KW => self.parse_this(),
-            OR | OR_OR => self.parse_lambda(),
-            FOR_KW => self.parse_for(),
-            WHILE_KW => self.parse_while(),
-            BREAK_KW => self.parse_break(),
-            CONTINUE_KW => self.parse_continue(),
-            RETURN_KW => self.parse_return(),
-            MATCH_KW => self.parse_match(),
-            _ => {
-                self.report_error(ParseError::ExpectedFactor);
-                Arc::new(ExprData::Error {
-                    id: self.new_node_id(),
-                    span,
-                })
-            }
-        }
-    }
-
     fn parse_symbol(&mut self) -> Expr {
         self.builder.start_node();
         let sym = self.expect_symbol().expect("symbol expected");
@@ -1232,79 +407,6 @@ impl Parser {
 
         let green = self.builder.finish_node(FLOAT_LIT_EXPR);
         Arc::new(ExprData::create_literal_float(
-            self.new_node_id(),
-            span,
-            green,
-            value,
-        ))
-    }
-
-    fn parse_template(&mut self) -> Expr {
-        self.builder.start_node();
-        let span = self.current_span();
-        let start = span.start();
-
-        self.builder.start_node();
-        self.assert(TEMPLATE_LITERAL);
-        let value = self.source_span(span);
-        let green = self.builder.finish_node(STRING_LIT_EXPR);
-
-        let mut parts: Vec<Expr> = Vec::new();
-        parts.push(Arc::new(ExprData::create_literal_str(
-            self.new_node_id(),
-            span,
-            green,
-            value,
-        )));
-
-        let mut done = false;
-
-        while !done {
-            parts.push(self.parse_expression());
-
-            let span = self.current_span();
-
-            if !self.is(TEMPLATE_LITERAL) {
-                done = true;
-            }
-
-            if !self.is(TEMPLATE_LITERAL) && !self.is(TEMPLATE_END_LITERAL) {
-                self.report_error(ParseError::UnclosedStringTemplate);
-                break;
-            }
-
-            self.builder.start_node();
-            let value = self.source_span(span);
-            self.advance();
-            let green = self.builder.finish_node(STRING_LIT_EXPR);
-
-            parts.push(Arc::new(ExprData::create_literal_str(
-                self.new_node_id(),
-                span,
-                green,
-                value,
-            )));
-        }
-
-        let span = self.span_from(start);
-
-        let green = self.builder.finish_node(TEMPLATE_EXPR);
-        Arc::new(ExprData::create_template(
-            self.new_node_id(),
-            span,
-            green,
-            parts,
-        ))
-    }
-
-    fn parse_string(&mut self) -> Expr {
-        let span = self.current_span();
-        self.builder.start_node();
-        self.assert(STRING_LITERAL);
-
-        let value = self.source_span(span);
-        let green = self.builder.finish_node(STRING_LIT_EXPR);
-        Arc::new(ExprData::create_literal_str(
             self.new_node_id(),
             span,
             green,
@@ -1449,7 +551,7 @@ impl Parser {
             let value = self.source_span(self.current_span());
             let len = self.token_widths[self.token_idx];
             self.offset += len;
-            debug_assert!(kind <= EOF);
+            debug_assert!(kind <= Eof);
             self.builder.token(kind, value);
             self.token_idx += 1;
         }
@@ -1463,7 +565,7 @@ impl Parser {
         if self.token_idx + idx < self.tokens.len() {
             self.tokens[self.token_idx + idx]
         } else {
-            EOF
+            Eof
         }
     }
 
@@ -1484,7 +586,6 @@ impl Parser {
         set.contains(self.current())
     }
 
-    #[allow(unused)]
     fn nth_is(&self, idx: usize, kind: TokenKind) -> bool {
         self.nth(idx) == kind
     }
@@ -1494,7 +595,7 @@ impl Parser {
     }
 
     fn is_eof(&self) -> bool {
-        self.current() == EOF
+        self.current() == Eof
     }
 
     fn start_node(&mut self) {

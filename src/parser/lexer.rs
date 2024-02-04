@@ -552,9 +552,9 @@ fn is_open(ch: Option<char>) -> bool {
 fn keywords_in_map() -> HashMap<&'static str, TokenKind> {
     let mut keywords = HashMap::with_capacity(30);
 
-    keywords.insert("true", True);
-    keywords.insert("false", False);
-    keywords.insert("nil", Nil);
+    keywords.insert("true", BoolLiteral);
+    keywords.insert("false", BoolLiteral);
+    keywords.insert("nil", NilLiteral);
     keywords.insert("def", DefKw);
     keywords.insert("const", ConstKw);
     keywords.insert("let", LetKw);
@@ -860,11 +860,11 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                (True, 4),
+                (BoolLiteral, 4),
                 (Whitespace, 1),
-                (False, 5),
+                (BoolLiteral, 5),
                 (Whitespace, 1),
-                (Nil, 3),
+                (NilLiteral, 3),
                 (Whitespace, 1),
                 (DefKw, 3),
                 (Whitespace, 1),

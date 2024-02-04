@@ -4,9 +4,8 @@ pub enum TokenKind {
     // literals
     StringLiteral,  // "string"
     RegexLiteral,   // #"[a-z]+"
-    True,           // true
-    False,          // false
-    Nil,            // nil
+    BoolLiteral,    // true/false
+    NilLiteral,     // nil
     I64Literal,     // -999
     F64Literal,     // -3.14e-15, nan, inf, -inf, -0.0
     C64Literal,     // -1.2+3.4j, 1j, -10+5j
@@ -54,6 +53,7 @@ pub enum TokenKind {
 
     // module
     ImportKw,
+    ExportKw,
 
     // Mark
     Underscore,      // _
@@ -69,18 +69,18 @@ pub enum TokenKind {
     And,             // &
     RightArrow,      // =>
 
+    // collections
+    ListOpen,   // (
+    VectorOpen, // [
+    MapOpen,    // {
+    SetOpen,    // #{
+
     // brackets
     ListClose,   // )
     VectorClose, // ]
     RBrace,      // }
     MapClose,    // }
     SetClose,    // }
-
-    // collections
-    ListOpen,   // (
-    VectorOpen, // [
-    MapOpen,    // {
-    SetOpen,    // #{
 
     // trivial
     Whitespace,  // , is treated as whitespace
@@ -94,59 +94,6 @@ pub enum TokenKind {
 
     // Syntax tree nodes
     SourceFile,
-
-    // Expressions
-    BoolLiteralExpr,
-    NilLiteralExpr,
-    I64LiteralExpr,
-    F64LiteralExpr,
-    C64LiteralExpr,
-    StringLiteralExpr,
-    RegexLiteralExpr,
-    KeywordLiteralExpr,
-    SymbolExpr,
-    TypeAnnotationExpr,
-    UnderScoreExpr,
-    QuoteExpr,
-    SyntaxQuoteExpr,
-    UnquoteExpr,
-    UnquoteSplicingExpr,
-    SplicingExpr,
-    DotExpr,
-    PipeExpr,
-    SlashExpr,
-    AndExpr,
-    RightArrowExpr,
-    ListExpr,
-    VectorExpr,
-    MapExpr,
-    SetExpr,
-    DefExpr,
-    ConstExpr,
-    LetExpr,
-    SeteExpr,
-    DefnExpr,
-    FnExpr,
-    ReturnExpr,
-    IfExpr,
-    WhenExpr,
-    CondExpr,
-    DoExpr,
-    SwitchExpr,
-    ForExpr,
-    WhileExpr,
-    BreakExpr,
-    ContinueExpr,
-    EnumExpr,
-    StructExpr,
-    MethodExpr,
-    SelfExpr,
-    MacroExpr,
-    TryExpr,
-    ThrowExpr,
-    CatchExpr,
-    FinallyExpr,
-    ImportExpr,
 
     Error,
 }
