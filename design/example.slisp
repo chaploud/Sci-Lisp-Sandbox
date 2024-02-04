@@ -493,11 +493,10 @@ i                            ; => 4 you can access i after loop.
 (import "path/to/somename")           ; import 'somename.lisp'
 (somename/somefunc 1 2 3)             ; => ...
 
-(defn somefunc [x y z]                ; export function
+(defn somefunc [x y z]
   (print x y z))
 
-(defn :private somefunc [x y z]       ; private function
-  (print x y z))
+(export [somefunc])                   ; export function
 
 ;; ===== Array API
 (def a (array [[1, 2, 3],             ; 2d-array of i64
@@ -518,6 +517,7 @@ i                            ; => 4 you can access i after loop.
 ;; ===== Scientific Constants
 
 
+;; 他のモジュールで定義された型の利用
 
 ;; Polars binding
 ;; Parallel(thread, coroutine, async)

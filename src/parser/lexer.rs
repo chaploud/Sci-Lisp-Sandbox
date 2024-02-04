@@ -178,7 +178,7 @@ impl<'a> Lexer<'a> {
 
     fn read_type_id(&mut self) -> TokenKind {
         let value = self.read_symbol_as_string();
-        TypeId
+        TypeAnnotation
     }
 
     fn read_keyword(&mut self) -> TokenKind {

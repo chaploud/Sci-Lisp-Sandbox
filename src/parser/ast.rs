@@ -2,6 +2,9 @@ use std::fmt;
 use std::slice::Iter;
 use std::sync::Arc;
 
+use num::complex::Complex64;
+use regex::Regex;
+
 use crate::parser::green::{GreenNode, GreenToken};
 use crate::parser::span::Span;
 use crate::parser::token::TokenKind;
@@ -53,10 +56,6 @@ impl File {
     #[cfg(test)]
     pub fn global0(&self) -> &Global {
         self.elements[0].to_global().unwrap()
-    }
-    #[cfg(test)]
-    pub fn const0(&self) -> &Const {
-        self.elements[0].to_const().unwrap()
     }
 }
 
@@ -144,7 +143,6 @@ pub struct Global {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
-    pub modifiers: Option<ModifierList>,
     pub name: Option<Sym>,
     pub mutable: bool,
     pub data_type: Type,
@@ -156,7 +154,6 @@ pub struct Enum {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
-    pub modifiers: Option<ModifierList>,
     pub name: Option<Sym>,
     pub type_params: Option<TypeParams>,
     pub variants: Vec<EnumVariant>,
@@ -176,7 +173,6 @@ pub struct Struct {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
-    pub modifiers: Option<ModifierList>,
     pub name: Option<Sym>,
     pub fields: Vec<StructField>,
     pub type_params: Option<TypeParams>,
@@ -187,7 +183,6 @@ pub struct StructField {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
-    pub modifiers: Option<ModifierList>,
     pub name: Option<Sym>,
     pub data_type: Type,
 }
@@ -199,7 +194,6 @@ pub enum TypeData {
     This(TypeSelfType),
     Basic(TypeBasicType),
     Lambda(TypeLambdaType),
-    Path(TypePathType),
     Generic(TypeGenericType),
     Error { id: NodeId, span: Span },
 }
@@ -216,7 +210,6 @@ pub struct TypeLambdaType {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
-
     pub params: Vec<Type>,
     pub ret: Option<Type>,
 }
@@ -226,18 +219,7 @@ pub struct TypeBasicType {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
-
-    pub path: Path,
     pub params: Vec<Type>,
-}
-
-#[derive(Clone, Debug)]
-pub struct TypePathType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub path: Path,
 }
 
 #[derive(Clone, Debug)]
@@ -269,61 +251,16 @@ impl TypeData {
         TypeData::This(TypeSelfType { id, span, green })
     }
 
-    pub fn create_basic(
-        id: NodeId,
-        span: Span,
-        green: GreenNode,
-        path: Path,
-        params: Vec<Type>,
-    ) -> TypeData {
-        TypeData::Basic(TypeBasicType {
-            id,
-            span,
-            green,
-            path,
-            params,
-        })
+    pub fn create_basic(id: NodeId, span: Span, green: GreenNode, params: Vec<Type>) -> TypeData {
+        TypeData::Basic(TypeBasicType { id, span, green, params, })
     }
 
-    pub fn create_path(id: NodeId, span: Span, green: GreenNode, path: Path) -> TypeData {
-        TypeData::Path(TypePathType {
-            id,
-            span,
-            green,
-            path,
-        })
+    pub fn create_generic( id: NodeId, span: Span, green: GreenNode, path: Type, params: Vec<Type>) -> TypeData {
+        TypeData::Generic(TypeGenericType { id, span, green, path, params, })
     }
 
-    pub fn create_generic(
-        id: NodeId,
-        span: Span,
-        green: GreenNode,
-        path: Type,
-        params: Vec<Type>,
-    ) -> TypeData {
-        TypeData::Generic(TypeGenericType {
-            id,
-            span,
-            green,
-            path,
-            params,
-        })
-    }
-
-    pub fn create_function(
-        id: NodeId,
-        span: Span,
-        green: GreenNode,
-        params: Vec<Type>,
-        ret: Option<Type>,
-    ) -> TypeData {
-        TypeData::Lambda(TypeLambdaType {
-            id,
-            span,
-            green,
-            params,
-            ret,
-        })
+    pub fn create_function( id: NodeId, span: Span, green: GreenNode, params: Vec<Type>, ret: Option<Type>,) -> TypeData {
+        TypeData::Lambda(TypeLambdaType { id, span, green, params, ret, })
     }
 
     pub fn to_basic(&self) -> Option<&TypeBasicType> {
@@ -341,38 +278,21 @@ impl TypeData {
     }
 
     #[cfg(test)]
-    pub fn is_unit(&self) -> bool {
-        match self {
-            &TypeData::Tuple(ref val) if val.subtypes.len() == 0 => true,
-            _ => false,
-        }
-    }
-
-    #[cfg(test)]
     pub fn to_string(&self) -> String {
         match *self {
             TypeData::This(_) => "Self".into(),
             TypeData::Basic(ref val) => val.name(),
-
-            TypeData::Tuple(ref val) => {
-                let types: Vec<String> = val.subtypes.iter().map(|t| t.to_string()).collect();
-
-                format!("({})", types.join(", "))
-            }
-
             TypeData::Lambda(ref val) => {
                 let types: Vec<String> = val.params.iter().map(|t| t.to_string()).collect();
 
                 if let Some(ref ret) = val.ret {
                     let ret = ret.to_string();
-                    format!("({}) -> {}", types.join(", "), ret)
+                    format!("({}) => {}", types.join(", "), ret)
                 } else {
-                    format!("({}) -> ()", types.join(", "))
+                    format!("({}) => ()", types.join(", "))
                 }
             }
-
-            TypeData::Generic(..) | TypeData::Path(..) => unreachable!(),
-
+            TypeData::Generic(..) => unreachable!(),
             TypeData::Error { .. } => "error type".into(),
         }
     }
@@ -383,7 +303,6 @@ impl TypeData {
             TypeData::Basic(ref val) => val.span,
             TypeData::Lambda(ref val) => val.span,
             TypeData::Error { span, .. } => span,
-            TypeData::Path(ref val) => val.span,
             TypeData::Generic(ref val) => val.span,
         }
     }
@@ -394,7 +313,6 @@ impl TypeData {
             TypeData::Basic(ref val) => val.id,
             TypeData::Lambda(ref val) => val.id,
             TypeData::Error { id, .. } => id,
-            TypeData::Path(ref val) => val.id,
             TypeData::Generic(ref val) => val.id,
         }
     }
@@ -405,21 +323,9 @@ pub struct TypeAlias {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
-
-    pub modifiers: Option<ModifierList>,
     pub name: Option<Sym>,
     pub bounds: Vec<Type>,
     pub ty: Option<Type>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExternPackage {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub modifiers: Option<ModifierList>,
-    pub name: Option<Sym>,
-    pub identifier: Option<Sym>,
 }
 
 #[derive(Clone, Debug)]
@@ -440,7 +346,6 @@ pub struct Field {
     pub id: NodeId,
     pub span: Span,
     pub green: GreenNode,
-    pub modifiers: Option<ModifierList>,
     pub name: Option<Sym>,
     pub data_type: Type,
     pub primary_ctor: bool,
@@ -469,7 +374,6 @@ pub struct Function {
     pub span: Span,
     pub green: GreenNode,
     pub kind: FunctionKind,
-
     pub name: Option<Sym>,
     pub type_params: Option<TypeParams>,
     pub params: Vec<Param>,
@@ -709,144 +613,259 @@ impl UnOp {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub enum CmpOp {
-    Eq,
-    Ne,
-    Lt,
-    Le,
-    Gt,
-    Ge,
-    Is,
-    IsNot,
-}
-
-impl CmpOp {
-    pub fn as_str(&self) -> &'static str {
-        match *self {
-            CmpOp::Eq => "==",
-            CmpOp::Ne => "!=",
-            CmpOp::Lt => "<",
-            CmpOp::Le => "<=",
-            CmpOp::Gt => ">",
-            CmpOp::Ge => ">=",
-            CmpOp::Is => "===",
-            CmpOp::IsNot => "!==",
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, Debug, Copy, Clone)]
-pub enum BinOp {
-    Assign,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Mod,
-    Cmp(CmpOp),
-    Or,
-    And,
-    BitOr,
-    BitAnd,
-    BitXor,
-    ShiftL,
-    ArithShiftR,
-    LogicalShiftR,
-}
-
-impl BinOp {
-    pub fn as_str(&self) -> &'static str {
-        match *self {
-            BinOp::Assign => "=",
-            BinOp::Add => "+",
-            BinOp::Sub => "-",
-            BinOp::Mul => "*",
-            BinOp::Div => "/",
-            BinOp::Mod => "%",
-            BinOp::Cmp(op) => op.as_str(),
-            BinOp::Or => "||",
-            BinOp::And => "&&",
-            BinOp::BitOr => "|",
-            BinOp::BitAnd => "&",
-            BinOp::BitXor => "^",
-            BinOp::ShiftL => "<<",
-            BinOp::ArithShiftR => ">>",
-            BinOp::LogicalShiftR => ">>>",
-        }
-    }
-
-    pub fn is_any_assign(&self) -> bool {
-        match *self {
-            BinOp::Assign => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_compare(&self) -> bool {
-        match *self {
-            BinOp::Cmp(cmp) if cmp != CmpOp::Is && cmp != CmpOp::IsNot => true,
-            _ => false,
-        }
-    }
-}
-
 pub type Expr = Arc<ExprData>;
 
 #[derive(Clone, Debug)]
 pub enum ExprData {
-    BoolLiteralExpr(BoolLiteralExprType),
-    NilLiteralExpr(NilLiteralExprType),
-    I64LiteralExpr(I64LiteralExprType),
-    F64LiteralExpr(F64LiteralExprType),
-    C64LiteralExpr(C64LiteralExprType),
-    StringLiteralExpr(StringLiteralExprType),
-    RegexLiteralExpr(RegexLiteralExprType),
-    KeywordLiteralExpr(KeywordLiteralExprType),
-    SymbolExpr(SymbolExprType),
-    TypeIdExpr(TypeIdExprType),
-    UnderScoreExpr(UnderScoreExprType),
-    QuoteExpr(QuoteExprType),
-    SyntaxQuoteExpr(SyntaxQuoteExprType),
-    UnquoteExpr(UnquoteExprType),
-    UnquoteSplicingExpr(UnquoteSplicingExprType),
-    SplicingExpr(SplicingExprType),
-    DotExpr(DotExprType),
-    PipeExpr(PipeExprType),
-    SlashExpr(SlashExprType),
-    AndExpr(AndExprType),
-    RightArrowExpr(RightArrowExprType),
-    ListExpr(ListExprType),
-    VectorExpr(VectorExprType),
-    MapExpr(MapExprType),
-    SetExpr(SetExprType),
-    DefExpr(DefExprType),
-    ConstExpr(ConstExprType),
-    LetExpr(LetExprType),
-    SeteExpr(SeteExprType),
-    DefnExpr(DefnExprType),
-    FnExpr(FnExprType),
-    ReturnExpr(ReturnExprType),
-    IfExpr(IfExprType),
-    WhenExpr(WhenExprType),
-    CondExpr(CondExprType),
-    DoExpr(DoExprType),
-    SwitchExpr(SwitchExprType),
-    ForExpr(ForExprType),
-    WhileExpr(WhileExprType),
-    BreakExpr(BreakExprType),
-    ContinueExpr(ContinueExprType),
-    EnumExpr(EnumExprType),
-    StructExpr(StructExprType),
-    MethodExpr(MethodExprType),
-    SelfExpr(SelfExprType),
-    MacroExpr(MacroExprType),
-    TryExpr(TryExprType),
-    ThrowExpr(ThrowExprType),
-    CatchExpr(CatchExprType),
-    FinallyExpr(FinallyExprType),
-    ImportExpr(ImportExprType),
+    BoolLiteral(BoolLiteralExprType),
+    NilLiteral(NilLiteralExprType),
+    I64Literal(I64LiteralExprType),
+    F64Literal(F64LiteralExprType),
+    C64Literal(C64LiteralExprType),
+    StringLiteral(StringLiteralExprType),
+    RegexLiteral(RegexLiteralExprType),
+    KeywordLiteral(KeywordLiteralExprType),
+    Symbol(SymbolExprType),
+    TypeAnnotation(TypeAnnotationExprType),
+    UnderScore(UnderScoreExprType),
+    Quote(QuoteExprType),
+    SyntaxQuote(SyntaxQuoteExprType),
+    Unquote(UnquoteExprType),
+    UnquoteSplicing(UnquoteSplicingExprType),
+    Splicing(SplicingExprType),
+    Dot(DotExprType),
+    Pipe(PipeExprType),
+    Slash(SlashExprType),
+    And(AndExprType),
+    RightArrow(RightArrowExprType),
+    List(ListExprType),
+    Vector(VectorExprType),
+    Map(MapExprType),
+    Set(SetExprType),
+    Def(DefExprType),
+    Const(ConstExprType),
+    Let(LetExprType),
+    Sete(SeteExprType),
+    Defn(DefnExprType),
+    Fn(FnExprType),
+    Return(ReturnExprType),
+    If(IfExprType),
+    When(WhenExprType),
+    Cond(CondExprType),
+    Do(DoExprType),
+    Switch(SwitchExprType),
+    For(ForExprType),
+    While(WhileExprType),
+    Break(BreakExprType),
+    Continue(ContinueExprType),
+    Enum(EnumExprType),
+    Struct(StructExprType),
+    Method(MethodExprType),
+    This(SelfExprType),
+    Macro(MacroExprType),
+    Try(TryExprType),
+    Throw(ThrowExprType),
+    Catch(CatchExprType),
+    Finally(FinallyExprType),
+    Import(ImportExprType),
     Error { id: NodeId, span: Span },
+}
+
+pub struct BoolLiteralExprType;
+pub struct I64LiteralExprType;
+pub struct NilLiteralExprType;
+pub struct F64LiteralExprType;
+pub struct C64LiteralExprType;
+pub struct StringLiteralExprType;
+pub struct RegexLiteralExprType;
+pub struct KeywordLiteralExprType;
+pub struct SymbolExprType;
+pub struct TypeAnnotationExprType;
+pub struct UnderScoreExprType;
+pub struct QuoteExprType;
+pub struct SyntaxQuoteExprType;
+pub struct UnquoteExprType;
+pub struct UnquoteSplicingExprType;
+pub struct SplicingExprType;
+pub struct DotExprType;
+pub struct PipeExprType;
+pub struct SlashExprType;
+pub struct AndExprType;
+pub struct RightArrowExprType;
+pub struct ListExprType;
+pub struct VectorExprType;
+pub struct MapExprType;
+pub struct SetExprType;
+pub struct DefExprType;
+pub struct ConstExprType;
+pub struct LetExprType;
+pub struct SeteExprType;
+pub struct DefnExprType;
+pub struct FnExprType;
+pub struct ReturnExprType;
+pub struct IfExprType;
+pub struct WhenExprType;
+pub struct CondExprType;
+pub struct DoExprType;
+pub struct SwitchExprType;
+pub struct ForExprType;
+pub struct WhileExprType;
+pub struct BreakExprType;
+pub struct ContinueExprType;
+pub struct EnumExprType;
+pub struct StructExprType;
+pub struct MethodExprType;
+pub struct SelfExprType;
+pub struct MacroExprType;
+pub struct TryExprType;
+pub struct ThrowExprType;
+pub struct CatchExprType;
+pub struct FinallyExprType;
+pub struct ImportExprType;
+
+#[derive(Clone, Debug)]
+pub struct ExprLiteralBoolType {
+    pub id: NodeId,
+    pub span: Span,
+    pub value: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprLiteralI64Type {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub value: i64,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprLiteralF64Type {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub value: f64,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprLiteralC64Type {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub value: Complex64,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprLiteralStringType {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub value: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprLiteralRegexType {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub value: Regex,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprLiteralKeywordType {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub value: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprSymbolType {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub name: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprIfType {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+
+    pub cond: Expr,
+    pub then_block: Expr,
+    pub else_block: Option<Expr>,
+}
+#[derive(Clone, Debug)]
+pub struct ExprBlockType {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub special_forms: Vec<SpecialForm>,
+    pub expr: Option<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprSelfType {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprCallType {
+    pub id: NodeId,
+    pub span: Span,
+    pub callee: Expr,
+    pub args: Vec<Expr>,
+}
+
+impl ExprCallType {
+    pub fn object(&self) -> Option<&ExprData> {
+        if let Some(type_param) = self.callee.to_type_param() {
+            if let Some(dot) = type_param.callee.to_dot() {
+                Some(&dot.lhs)
+            } else {
+                None
+            }
+        } else if let Some(dot) = self.callee.to_dot() {
+            Some(&dot.lhs)
+        } else {
+            None
+        }
+    }
+
+    pub fn object_or_callee(&self) -> &ExprData {
+        self.object().unwrap_or(&self.callee)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprParenType {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub expr: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprTypeParamType {
+    pub id: NodeId,
+    pub span: Span,
+    pub op_span: Span,
+
+    pub callee: Expr,
+    pub args: Vec<Type>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExprDotType {
+    pub id: NodeId,
+    pub span: Span,
+    pub op_span: Span,
+
+    pub lhs: Expr,
+    pub rhs: Expr,
 }
 
 impl ExprData {
@@ -854,15 +873,14 @@ impl ExprData {
         id: NodeId,
         span: Span,
         green: GreenNode,
-        SpecialForms: Vec<SpecialForm>,
+        special_forms: Vec<SpecialForm>,
         expr: Option<Expr>,
     ) -> ExprData {
         ExprData::Block(ExprBlockType {
             id,
             span,
             green,
-
-            SpecialForms,
+            special_forms,
             expr,
         })
     }
@@ -1001,7 +1019,7 @@ impl ExprData {
     }
 
     pub fn create_literal_int(id: NodeId, span: Span, green: GreenNode, value: String) -> ExprData {
-        ExprData::LiteralInt(ExprLiteralIntType {
+        ExprData::LiteralInt(ExprLiteralI64Type {
             id,
             span,
             green,
@@ -1015,7 +1033,7 @@ impl ExprData {
         green: GreenNode,
         value: String,
     ) -> ExprData {
-        ExprData::LiteralFloat(ExprLiteralFloatType {
+        ExprData::LiteralFloat(ExprLiteralF64Type {
             id,
             span,
             green,
@@ -1024,7 +1042,7 @@ impl ExprData {
     }
 
     pub fn create_literal_str(id: NodeId, span: Span, green: GreenNode, value: String) -> ExprData {
-        ExprData::LiteralStr(ExprLiteralStrType {
+        ExprData::LiteralStr(ExprLiteralStringType {
             id,
             span,
             green,
@@ -1050,7 +1068,7 @@ impl ExprData {
     }
 
     pub fn create_ident(id: NodeId, span: Span, green: GreenNode, name: String) -> ExprData {
-        ExprData::Sym(ExprSymType {
+        ExprData::Sym(ExprSymbolType {
             id,
             span,
             green,
@@ -1198,7 +1216,7 @@ impl ExprData {
         }
     }
 
-    pub fn to_ident(&self) -> Option<&ExprSymType> {
+    pub fn to_ident(&self) -> Option<&ExprSymbolType> {
         match *self {
             ExprData::Sym(ref val) => Some(val),
             _ => None,
@@ -1254,13 +1272,6 @@ impl ExprData {
         }
     }
 
-    pub fn to_literal_char(&self) -> Option<&ExprLiteralCharType> {
-        match *self {
-            ExprData::LiteralChar(ref val) => Some(val),
-            _ => None,
-        }
-    }
-
     pub fn is_literal_char(&self) -> bool {
         match *self {
             ExprData::LiteralChar(_) => true,
@@ -1268,7 +1279,7 @@ impl ExprData {
         }
     }
 
-    pub fn to_literal_int(&self) -> Option<&ExprLiteralIntType> {
+    pub fn to_literal_int(&self) -> Option<&ExprLiteralI64Type> {
         match *self {
             ExprData::LiteralInt(ref val) => Some(val),
             _ => None,
@@ -1282,21 +1293,7 @@ impl ExprData {
         }
     }
 
-    pub fn to_template(&self) -> Option<&ExprTemplateType> {
-        match *self {
-            ExprData::Template(ref val) => Some(val),
-            _ => None,
-        }
-    }
-
-    pub fn is_template(&self) -> bool {
-        match *self {
-            ExprData::Template(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn to_literal_float(&self) -> Option<&ExprLiteralFloatType> {
+    pub fn to_literal_float(&self) -> Option<&ExprLiteralF64Type> {
         match *self {
             ExprData::LiteralFloat(ref val) => Some(val),
             _ => None,
@@ -1310,7 +1307,7 @@ impl ExprData {
         }
     }
 
-    pub fn to_literal_str(&self) -> Option<&ExprLiteralStrType> {
+    pub fn to_literal_str(&self) -> Option<&ExprLiteralStringType> {
         match *self {
             ExprData::LiteralStr(ref val) => Some(val),
             _ => None,
@@ -1366,20 +1363,6 @@ impl ExprData {
         }
     }
 
-    pub fn to_conv(&self) -> Option<&ExprConvType> {
-        match *self {
-            ExprData::Conv(ref val) => Some(val),
-            _ => None,
-        }
-    }
-
-    pub fn is_conv(&self) -> bool {
-        match *self {
-            ExprData::Conv(_) => true,
-            _ => false,
-        }
-    }
-
     pub fn to_lambda(&self) -> Option<Arc<Function>> {
         match *self {
             ExprData::Lambda(ref val) => Some(val.clone()),
@@ -1390,20 +1373,6 @@ impl ExprData {
     pub fn is_lambda(&self) -> bool {
         match self {
             &ExprData::Lambda(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn to_tuple(&self) -> Option<&ExprTupleType> {
-        match *self {
-            ExprData::Tuple(ref val) => Some(val),
-            _ => None,
-        }
-    }
-
-    pub fn is_tuple(&self) -> bool {
-        match *self {
-            ExprData::Tuple(_) => true,
             _ => false,
         }
     }
@@ -1478,21 +1447,8 @@ impl ExprData {
         }
     }
 
-    pub fn needs_semicolon(&self) -> bool {
-        match self {
-            &ExprData::Block(_) => false,
-            &ExprData::If(_) => false,
-            &ExprData::Match(_) => false,
-            &ExprData::For(_) => false,
-            &ExprData::While(_) => false,
-            _ => true,
-        }
-    }
-
     pub fn span(&self) -> Span {
         match *self {
-            ExprData::Un(ref val) => val.span,
-            ExprData::Bin(ref val) => val.span,
             ExprData::LiteralChar(ref val) => val.span,
             ExprData::LiteralInt(ref val) => val.span,
             ExprData::LiteralFloat(ref val) => val.span,
@@ -1523,284 +1479,60 @@ impl ExprData {
 
     pub fn id(&self) -> NodeId {
         match *self {
-            ExprData::Un(ref val) => val.id,
-            ExprData::Bin(ref val) => val.id,
-            ExprData::LiteralChar(ref val) => val.id,
-            ExprData::LiteralInt(ref val) => val.id,
-            ExprData::LiteralFloat(ref val) => val.id,
-            ExprData::LiteralStr(ref val) => val.id,
-            ExprData::Template(ref val) => val.id,
-            ExprData::LiteralBool(ref val) => val.id,
-            ExprData::Sym(ref val) => val.id,
-            ExprData::Call(ref val) => val.id,
-            ExprData::TypeParam(ref val) => val.id,
-            ExprData::Path(ref val) => val.id,
-            ExprData::Dot(ref val) => val.id,
-            ExprData::This(ref val) => val.id,
-            ExprData::Conv(ref val) => val.id,
-            ExprData::Lambda(ref val) => val.id,
-            ExprData::Block(ref val) => val.id,
-            ExprData::If(ref val) => val.id,
-            ExprData::Tuple(ref val) => val.id,
-            ExprData::Paren(ref val) => val.id,
-            ExprData::Match(ref val) => val.id,
-            ExprData::For(ref val) => val.id,
-            ExprData::While(ref val) => val.id,
-            ExprData::Break(ref val) => val.id,
-            ExprData::Continue(ref val) => val.id,
-            ExprData::Return(ref val) => val.id,
-            ExprData::Error { id, .. } => id,
+    BoolLiteralExpr(BoolLiteralExprType),
+    NilLiteralExpr(NilLiteralExprType),
+    I64LiteralExpr(I64LiteralExprType),
+    F64LiteralExpr(F64LiteralExprType),
+    C64LiteralExpr(C64LiteralExprType),
+    StringLiteralExpr(StringLiteralExprType),
+    RegexLiteralExpr(RegexLiteralExprType),
+    KeywordLiteralExpr(KeywordLiteralExprType),
+    SymbolExpr(SymbolExprType),
+    TypeAnnotationExpr(TypeAnnotationExprType),
+    UnderScoreExpr(UnderScoreExprType),
+    QuoteExpr(QuoteExprType),
+    SyntaxQuoteExpr(SyntaxQuoteExprType),
+    UnquoteExpr(UnquoteExprType),
+    UnquoteSplicingExpr(UnquoteSplicingExprType),
+    SplicingExpr(SplicingExprType),
+    DotExpr(DotExprType),
+    PipeExpr(PipeExprType),
+    SlashExpr(SlashExprType),
+    AndExpr(AndExprType),
+    RightArrowExpr(RightArrowExprType),
+    ListExpr(ListExprType),
+    VectorExpr(VectorExprType),
+    MapExpr(MapExprType),
+    SetExpr(SetExprType),
+    DefExpr(DefExprType),
+    ConstExpr(ConstExprType),
+    LetExpr(LetExprType),
+    SeteExpr(SeteExprType),
+    DefnExpr(DefnExprType),
+    FnExpr(FnExprType),
+    ReturnExpr(ReturnExprType),
+    IfExpr(IfExprType),
+    WhenExpr(WhenExprType),
+    CondExpr(CondExprType),
+    DoExpr(DoExprType),
+    SwitchExpr(SwitchExprType),
+    ForExpr(ForExprType),
+    WhileExpr(WhileExprType),
+    BreakExpr(BreakExprType),
+    ContinueExpr(ContinueExprType),
+    EnumExpr(EnumExprType),
+    StructExpr(StructExprType),
+    MethodExpr(MethodExprType),
+    SelfExpr(SelfExprType),
+    MacroExpr(MacroExprType),
+    TryExpr(TryExprType),
+    ThrowExpr(ThrowExprType),
+    CatchExpr(CatchExprType),
+    FinallyExpr(FinallyExprType),
+    ImportExpr(ImportExprType),
+    Error { id: NodeId, span: Span },
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprIfType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub cond: Expr,
-    pub then_block: Expr,
-    pub else_block: Option<Expr>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprTupleType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub values: Vec<Expr>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprConvType {
-    pub id: NodeId,
-    pub span: Span,
-
-    pub object: Expr,
-    pub data_type: Type,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprUnType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub op: UnOp,
-    pub opnd: Expr,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprBinType {
-    pub id: NodeId,
-    pub span: Span,
-
-    pub op: BinOp,
-    pub initializer: bool,
-    pub lhs: Expr,
-    pub rhs: Expr,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprLiteralCharType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub value: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprLiteralIntType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub value: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprLiteralFloatType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub value: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprLiteralStrType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub value: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprTemplateType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub parts: Vec<Expr>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprLiteralBoolType {
-    pub id: NodeId,
-    pub span: Span,
-
-    pub value: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprBlockType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub SpecialForms: Vec<SpecialForm>,
-    pub expr: Option<Expr>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprSelfType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprSymType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub name: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprCallType {
-    pub id: NodeId,
-    pub span: Span,
-
-    pub callee: Expr,
-    pub args: Vec<Expr>,
-}
-
-impl ExprCallType {
-    pub fn object(&self) -> Option<&ExprData> {
-        if let Some(type_param) = self.callee.to_type_param() {
-            if let Some(dot) = type_param.callee.to_dot() {
-                Some(&dot.lhs)
-            } else {
-                None
-            }
-        } else if let Some(dot) = self.callee.to_dot() {
-            Some(&dot.lhs)
-        } else {
-            None
-        }
-    }
-
-    pub fn object_or_callee(&self) -> &ExprData {
-        self.object().unwrap_or(&self.callee)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprParenType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub expr: Expr,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprMatchType {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-
-    pub expr: Expr,
-    pub cases: Vec<MatchCaseType>,
-}
-
-#[derive(Clone, Debug)]
-pub struct MatchCaseType {
-    pub id: NodeId,
-    pub span: Span,
-
-    pub patterns: Vec<MatchPattern>,
-    pub value: Expr,
-}
-
-#[derive(Clone, Debug)]
-pub struct MatchPattern {
-    pub id: NodeId,
-    pub span: Span,
-    pub data: MatchPatternData,
-}
-
-#[derive(Clone, Debug)]
-pub enum MatchPatternData {
-    Underscore,
-    Sym(MatchPatternSym),
-}
-
-#[derive(Clone, Debug)]
-pub struct MatchPatternSym {
-    pub path: Path,
-    pub params: Option<Vec<MatchPatternParam>>,
-}
-
-#[derive(Clone, Debug)]
-pub struct MatchPatternParam {
-    pub id: NodeId,
-    pub span: Span,
-    pub name: Option<Sym>,
-    pub mutable: bool,
-}
-
-pub type Path = Arc<PathData>;
-
-#[derive(Clone, Debug)]
-pub struct PathData {
-    pub id: NodeId,
-    pub span: Span,
-    pub names: Vec<Sym>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprTypeParamType {
-    pub id: NodeId,
-    pub span: Span,
-    pub op_span: Span,
-
-    pub callee: Expr,
-    pub args: Vec<Type>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprPathType {
-    pub id: NodeId,
-    pub span: Span,
-    pub op_span: Span,
-
-    pub lhs: Expr,
-    pub rhs: Expr,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExprDotType {
-    pub id: NodeId,
-    pub span: Span,
-    pub op_span: Span,
-
-    pub lhs: Expr,
-    pub rhs: Expr,
 }
 
 fn find_token(node: &GreenNode, token: TokenKind) -> Option<GreenToken> {

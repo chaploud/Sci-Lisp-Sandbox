@@ -14,7 +14,7 @@ pub enum TokenKind {
     Symbol,         // identifier
 
     // type identifier
-    TypeId, // #i64, #f64, #str,...
+    TypeAnnotation, // #i64, #f64, #str,...
 
     // keywords
     // define variable
@@ -105,7 +105,7 @@ pub enum TokenKind {
     RegexLiteralExpr,
     KeywordLiteralExpr,
     SymbolExpr,
-    TypeIdExpr,
+    TypeAnnotationExpr,
     UnderScoreExpr,
     QuoteExpr,
     SyntaxQuoteExpr,

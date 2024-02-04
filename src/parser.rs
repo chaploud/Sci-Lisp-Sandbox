@@ -53,11 +53,6 @@ pub struct Parser {
     builder: GreenTreeBuilder,
 }
 
-enum SpecialOrExpr {
-    Special(SpecialForm),
-    Expr(Expr),
-}
-
 impl Parser {
     pub fn from_string(code: &'static str) -> Parser {
         let content = Arc::new(String::from(code));
@@ -460,30 +455,6 @@ impl Parser {
         }
 
         bounds
-    }
-
-    fn parse_modifiers(&mut self) -> Option<ModifierList> {
-        if self.is_set(MODIFIER_FIRST) {
-            self.start_node();
-            let marker = self.builder.create_marker();
-            let mut modifiers: Vec<Modifier> = Vec::new();
-
-            while self.is_set(MODIFIER_FIRST) {
-                modifiers.push(self.parse_modifier());
-            }
-
-            assert!(!modifiers.is_empty());
-            let green = self.builder.finish_node_starting_at(MODIFIERS, marker);
-
-            Some(ModifierList {
-                id: self.new_node_id(),
-                span: self.finish_node(),
-                green,
-                modifiers,
-            })
-        } else {
-            None
-        }
     }
 
     fn parse_modifier(&mut self) -> Modifier {
