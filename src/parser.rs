@@ -108,14 +108,14 @@ impl Parser {
         let mut expressions = vec![];
 
         while !self.is_eof() {
-            expressions.push(self.parse_toplevel());
+            expressions.push(self.parse_expr());
         }
 
         let green = self.builder.finish_node(SourceFile);
         ast::File { green, expressions }
     }
 
-    fn parse_toplevel(&mut self) -> Expr {
+    fn parse_expr(&mut self) -> Expr {
         self.builder.start_node();
         match self.current() {
             StringLiteral => {
@@ -318,6 +318,112 @@ impl Parser {
             span,
             green,
             value,
+        }))
+    }
+    /*
+    #[derive(Clone, Debug)]
+    pub struct IdentData {
+        pub span: Span,
+        pub name_as_string: String,
+    }
+
+    pub type Ident = Arc<IdentData>;
+
+    #[derive(Clone, Debug)]
+    pub enum LetPattern {
+        Ident(LetIdentType),
+        Tuple(LetTupleType),
+        Underscore(LetUnderscoreType),
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct LetIdentType {
+        pub id: NodeId,
+        pub span: Span,
+        pub mutable: bool,
+        pub name: Option<Ident>,
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum ExprData {
+        Un(ExprUnType),
+        Bin(ExprBinType),
+        LitChar(ExprLitCharType),
+        LitInt(ExprLitIntType),
+        LitFloat(ExprLitFloatType),
+        LitStr(ExprLitStrType),
+        Template(ExprTemplateType),
+        LitBool(ExprLitBoolType),
+        Ident(ExprIdentType),
+
+    #[derive(Clone, Debug)]
+    pub struct ExprIdentType {
+        pub id: NodeId,
+        pub span: Span,
+        pub green: GreenNode,
+        pub name: String,
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum MatchPatternData {
+        Underscore,
+        Ident(MatchPatternIdent),
+    }
+
+    #[derive(Clone, Debug)]
+    pub struct MatchPatternIdent {
+        pub path: Path,
+        pub params: Option<Vec<MatchPatternParam>>,
+    }
+    */
+
+    // TODO: Symbolにはいろいろな状況下での使われ方があるため
+    // 後回し
+    // fn parse_symbol(&mut self) -> Expr {
+    //     let span = self.current_span();
+    //     self.builder.start_node();
+
+    //     let value = self.source_span(span).to_string();
+    //     let green = self.builder.finish_node(Symbol);
+    //     Arc::new(ExprData::Symbol(SymbolData {
+    //         id: self.new_node_id(),
+    //         span,
+    //         green,
+    //         value,
+    //     }))
+    // }
+
+    fn parse_type_annotation(&mut self) -> Expr {
+        let span = self.current_span();
+        self.builder.start_node();
+
+        self.advance();
+        let ty = self.parse_expr();
+        let green = self.builder.finish_node(TypeAnnotation);
+        Arc::new(ExprData::TypeAnnotation(TypeAnnotationData {
+            id: self.new_node_id(),
+            span,
+            green,
+            data_type: ty,
+        }))
+    }
+
+    fn parse_vector(&mut self) -> Expr {
+        let span = self.current_span();
+        self.builder.start_node();
+
+        self.advance();
+        let mut elements = vec![];
+        while !self.is_eof() && !self.eat(VectorClose) {
+            elements.push(self.parse_expr());
+        }
+
+        let green = self.builder.finish_node(VectorOpen);
+        Arc::new(ExprData::Vector(VectorData {
+            id: self.new_node_id(),
+            span,
+            green,
+            elements,
         }))
     }
 

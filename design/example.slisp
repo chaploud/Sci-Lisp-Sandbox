@@ -442,6 +442,9 @@ i                            ; => 4 you can access i after loop.
 #collection              ; collection
 #option[#i64]            ; option of i64
 
+;; モジュールからインポートした型の書き方がむずい
+;; #module/type, module/#type どうすべきか...後者かな
+
 ;; ===== User Defined Type
 (enum Color                         ; define enum
   "Color enum"

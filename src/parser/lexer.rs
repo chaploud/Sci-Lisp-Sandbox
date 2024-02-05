@@ -177,13 +177,13 @@ impl<'a> Lexer<'a> {
     }
 
     fn read_type_annotation(&mut self) -> TokenKind {
-        let value = self.read_symbol_as_string();
+        let _ = self.read_symbol_as_string();
         TypeAnnotation
     }
 
     fn read_keyword(&mut self) -> TokenKind {
         self.eat_char();
-        let value = self.read_symbol_as_string();
+        let _ = self.read_symbol_as_string();
         KeywordLiteral
     }
 
