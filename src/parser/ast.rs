@@ -1,15 +1,11 @@
 use std::fmt;
-use std::slice::Iter;
 use std::sync::Arc;
 
 use indexmap::{IndexMap, IndexSet};
 use num::complex::Complex64;
-use regex::Regex;
 
-use crate::parser::green::{GreenNode, GreenToken};
+use crate::parser::green::GreenNode;
 use crate::parser::span::Span;
-use crate::parser::token::TokenKind;
-use crate::parser::token::TokenKind::*;
 
 pub mod dump;
 pub mod visit;
@@ -62,11 +58,6 @@ pub enum ExprData {
     Set(SetData),
     Slice(Arc<SliceData>),
     Underscore(UnderscoreData),
-    Quote(Arc<QuoteData>),
-    SyntaxQuote(Arc<SyntaxQuoteData>),
-    Unquote(Arc<UnquoteData>),
-    UnquoteSplicing(Arc<UnquoteSplicingData>),
-    Splicing(Arc<SplicingData>),
     Dot(Arc<DotData>),
     Slash(Arc<SlashData>),
     Def(Arc<DefData>),
@@ -74,27 +65,27 @@ pub enum ExprData {
     Let(Arc<LetData>),
     Scope(Arc<ScopeData>),
     Sete(Arc<SeteData>),
-    Defn(DefnData),
-    Fn(FnData),
-    Function(Function),
-    Call(CallData),
-    Return(ReturnData),
-    If(IfData),
-    When(WhenData),
-    Cond(CondData),
-    Switch(SwitchData),
+    Defn(Arc<DefnData>),
+    Fn(Arc<FnData>),
+    Function(Arc<Function>),
+    Call(Arc<CallData>),
+    Return(Arc<ReturnData>),
+    If(Arc<IfData>),
+    When(Arc<WhenData>),
+    Cond(Arc<CondData>),
+    Switch(Arc<SwitchData>),
     Do(DoData),
-    For(ForData),
-    While(WhileData),
+    For(Arc<ForData>),
+    While(Arc<WhileData>),
     Break(BreakData),
     Continue(ContinueData),
-    Try(TryData),
-    Throw(ThrowData),
-    Catch(CatchData),
-    Finally(FinallyData),
+    Try(Arc<TryData>),
+    Throw(Arc<ThrowData>),
+    Catch(Arc<CatchData>),
+    Finally(Arc<FinallyData>),
     Enum(Enum),
     Struct(Struct),
-    Macro(Macro),
+    Macro(Arc<Macro>),
     Import(ImportData),
     Export(ExportData),
     Error { id: NodeId, span: Span },
@@ -119,11 +110,6 @@ impl ExprData {
             ExprData::Set(ref node) => node.span,
             ExprData::Slice(ref node) => node.span,
             ExprData::Underscore(ref node) => node.span,
-            ExprData::Quote(ref node) => node.span,
-            ExprData::SyntaxQuote(ref node) => node.span,
-            ExprData::Unquote(ref node) => node.span,
-            ExprData::UnquoteSplicing(ref node) => node.span,
-            ExprData::Splicing(ref node) => node.span,
             ExprData::Dot(ref node) => node.span,
             ExprData::Slash(ref node) => node.span,
             ExprData::Def(ref node) => node.span,

@@ -128,7 +128,7 @@ impl<'a> Lexer<'a> {
             Some('{') => self.read_set_start(),
             _ => {
                 if is_symbol_start(next) {
-                    self.read_type_id()
+                    self.read_type_annotation()
                 } else {
                     self.report_error_at(
                         ParseError::ExpectedToken("'\"', '{' or symbol".to_string()),
@@ -176,7 +176,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_type_id(&mut self) -> TokenKind {
+    fn read_type_annotation(&mut self) -> TokenKind {
         let value = self.read_symbol_as_string();
         TypeAnnotation
     }
