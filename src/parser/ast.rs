@@ -42,7 +42,7 @@ impl fmt::Display for NodeId {
     }
 }
 
-pub type Expr = Arc<ExprData>;
+pub type Expr = ExprData;
 
 #[derive(Clone, Debug)]
 pub enum ExprData {
@@ -55,13 +55,13 @@ pub enum ExprData {
     C64(C64Data),
     Keyword(KeywordData),
     Symbol(SymbolData),
-    TypeAnnotation(Arc<TypeAnnotationData>),
-    List(Arc<ListData>),
-    Vector(Arc<VectorData>),
-    Map(Arc<MapData>),
-    Set(Arc<SetData>),
+    TypeAnnotation(TypeAnnotationData),
+    List(ListData),
+    Vector(VectorData),
+    Map(MapData),
+    Set(SetData),
     Slice(Arc<SliceData>),
-    Underscore(Arc<UnderscoreData>),
+    Underscore(UnderscoreData),
     Quote(Arc<QuoteData>),
     SyntaxQuote(Arc<SyntaxQuoteData>),
     Unquote(Arc<UnquoteData>),
@@ -69,7 +69,94 @@ pub enum ExprData {
     Splicing(Arc<SplicingData>),
     Dot(Arc<DotData>),
     Slash(Arc<SlashData>),
+    Def(Arc<DefData>),
+    Const(Arc<ConstData>),
+    Let(Arc<LetData>),
+    Scope(Arc<ScopeData>),
+    Sete(Arc<SeteData>),
+    Defn(DefnData),
+    Fn(FnData),
+    Function(Function),
+    Call(CallData),
+    Return(ReturnData),
+    If(IfData),
+    When(WhenData),
+    Cond(CondData),
+    Switch(SwitchData),
+    Do(DoData),
+    For(ForData),
+    While(WhileData),
+    Break(BreakData),
+    Continue(ContinueData),
+    Try(TryData),
+    Throw(ThrowData),
+    Catch(CatchData),
+    Finally(FinallyData),
+    Enum(Enum),
+    Struct(Struct),
+    Macro(Macro),
+    Import(ImportData),
+    Export(ExportData),
     Error { id: NodeId, span: Span },
+}
+
+impl ExprData {
+    pub fn span(&self) -> Span {
+        match self {
+            ExprData::String(ref node) => node.span,
+            ExprData::Regex(ref node) => node.span,
+            ExprData::Bool(ref node) => node.span,
+            ExprData::Nil(ref node) => node.span,
+            ExprData::I64(ref node) => node.span,
+            ExprData::F64(ref node) => node.span,
+            ExprData::C64(ref node) => node.span,
+            ExprData::Keyword(ref node) => node.span,
+            ExprData::Symbol(ref node) => node.span,
+            ExprData::TypeAnnotation(ref node) => node.span,
+            ExprData::List(ref node) => node.span,
+            ExprData::Vector(ref node) => node.span,
+            ExprData::Map(ref node) => node.span,
+            ExprData::Set(ref node) => node.span,
+            ExprData::Slice(ref node) => node.span,
+            ExprData::Underscore(ref node) => node.span,
+            ExprData::Quote(ref node) => node.span,
+            ExprData::SyntaxQuote(ref node) => node.span,
+            ExprData::Unquote(ref node) => node.span,
+            ExprData::UnquoteSplicing(ref node) => node.span,
+            ExprData::Splicing(ref node) => node.span,
+            ExprData::Dot(ref node) => node.span,
+            ExprData::Slash(ref node) => node.span,
+            ExprData::Def(ref node) => node.span,
+            ExprData::Const(ref node) => node.span,
+            ExprData::Let(ref node) => node.span,
+            ExprData::Scope(ref node) => node.span,
+            ExprData::Sete(ref node) => node.span,
+            ExprData::Defn(ref node) => node.span,
+            ExprData::Fn(ref node) => node.span,
+            ExprData::Function(ref node) => node.span,
+            ExprData::Call(ref node) => node.span,
+            ExprData::Return(ref node) => node.span,
+            ExprData::If(ref node) => node.span,
+            ExprData::When(ref node) => node.span,
+            ExprData::Cond(ref node) => node.span,
+            ExprData::Switch(ref node) => node.span,
+            ExprData::Do(ref node) => node.span,
+            ExprData::For(ref node) => node.span,
+            ExprData::While(ref node) => node.span,
+            ExprData::Break(ref node) => node.span,
+            ExprData::Continue(ref node) => node.span,
+            ExprData::Try(ref node) => node.span,
+            ExprData::Throw(ref node) => node.span,
+            ExprData::Catch(ref node) => node.span,
+            ExprData::Finally(ref node) => node.span,
+            ExprData::Enum(ref node) => node.span,
+            ExprData::Struct(ref node) => node.span,
+            ExprData::Macro(ref node) => node.span,
+            ExprData::Import(ref node) => node.span,
+            ExprData::Export(ref node) => node.span,
+            ExprData::Error { span, .. } => span.clone(),
+        }
+    }
 }
 
 // TODO: Path  #str/hoge
@@ -145,7 +232,7 @@ pub struct SymbolData {
     pub name: std::string::String,
 }
 
-pub type Sym = Arc<SymbolData>;
+pub type Sym = SymbolData;
 
 #[derive(Clone, Debug)]
 pub struct TypeAnnotationData {
@@ -258,44 +345,268 @@ pub struct SlashData {
     pub rhs: Sym,
 }
 
-impl ExprData {
-    pub fn span(&self) -> Span {
-        match self {
-            ExprData::String(ref node) => node.span,
-            ExprData::Regex(ref node) => node.span,
-            ExprData::Bool(ref node) => node.span,
-            ExprData::Nil(ref node) => node.span,
-            ExprData::I64(ref node) => node.span,
-            ExprData::F64(ref node) => node.span,
-            ExprData::C64(ref node) => node.span,
-            ExprData::Keyword(ref node) => node.span,
-            ExprData::Symbol(ref node) => node.span,
-            ExprData::TypeAnnotation(ref node) => node.span,
-            ExprData::List(ref node) => node.span,
-            ExprData::Vector(ref node) => node.span,
-            ExprData::Map(ref node) => node.span,
-            ExprData::Set(ref node) => node.span,
-            ExprData::Slice(ref node) => node.span,
-            ExprData::Underscore(ref node) => node.span,
-            ExprData::Quote(ref node) => node.span,
-            ExprData::SyntaxQuote(ref node) => node.span,
-            ExprData::Unquote(ref node) => node.span,
-            ExprData::UnquoteSplicing(ref node) => node.span,
-            ExprData::Splicing(ref node) => node.span,
-            ExprData::Dot(ref node) => node.span,
-            ExprData::Slash(ref node) => node.span,
-            ExprData::
-            ExprData::Error { span, .. } => span.clone(),
-        }
-    }
+// TODO: デストラクチャリングの高速実行
+
+#[derive(Clone, Debug)]
+pub struct DefData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub name: Option<Sym>,
+    pub mutable: bool,
+    pub data_type: Type,
+    pub value: Expr,
 }
 
-pub type Type = Arc<TypeData>;
+#[derive(Clone, Debug)]
+pub struct ConstData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub name: Sym,
+    pub mutable: bool,
+    pub data_type: Type,
+    pub value: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct LetData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub data_type: Option<Type>,
+    pub value: Option<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ScopeData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub expr: Option<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SeteData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub name: Sym,
+    pub value: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct DefnData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub name: Sym,
+    pub params: Vec<Sym>,
+    pub ret: Option<Type>,
+    pub body: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct FnData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub params: Vec<Sym>,
+    pub ret: Option<Type>,
+    pub body: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct Function {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub params: Vec<Sym>,
+    pub ret: Option<Type>,
+    pub body: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct CallData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub func: Expr,
+    pub args: Vec<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ReturnData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub value: Option<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct IfData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub cond: Expr,
+    pub then: Expr,
+    pub else_: Option<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct WhenData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub cond: Expr,
+    pub then: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct CondData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub clauses: Vec<(Expr, Expr)>,
+    pub else_: Option<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SwitchData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub value: Expr,
+    pub cases: Vec<(Expr, Expr)>,
+    pub else_: Option<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct DoData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub exprs: Vec<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ForData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub name: Sym,
+    pub iter: Expr,
+    pub body: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct WhileData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub cond: Expr,
+    pub body: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct BreakData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+}
+
+#[derive(Clone, Debug)]
+pub struct ContinueData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+}
+
+#[derive(Clone, Debug)]
+pub struct TryData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub expr: Expr,
+    pub catch: Option<(Sym, Expr)>,
+    pub finally: Option<Expr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ThrowData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub expr: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct CatchData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub name: Sym,
+    pub expr: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct FinallyData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub expr: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct Enum {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub name: Sym,
+    pub members: Vec<Sym>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Struct {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub name: Sym,
+    pub members: Vec<(Sym, Type)>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Macro {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub name: Sym,
+    pub params: Vec<Sym>,
+    pub body: Expr,
+}
+
+#[derive(Clone, Debug)]
+pub struct ImportData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub path: std::string::String,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExportData {
+    pub id: NodeId,
+    pub span: Span,
+    pub green: GreenNode,
+    pub name: Sym,
+}
+
+pub type Type = TypeData;
 
 #[derive(Clone, Debug)]
 pub enum TypeData {
     Basic(TypeBasic),
-    Lambda(TypeLambda),
+    Lambda(Arc<TypeLambda>),
     Generic(TypeGeneric),
     Array(TypeArray),
     Error { id: NodeId, span: Span },
@@ -320,7 +631,6 @@ pub struct TypeLambda {
     pub ret: Option<Type>,
 }
 
-
 #[derive(Clone, Debug)]
 pub struct TypeGeneric {
     pub id: NodeId,
@@ -335,7 +645,7 @@ pub struct TypeArray {
     pub span: Span,
     pub green: GreenNode,
     pub params: Vec<Type>,
-    pub shape: Vec<usize>
+    pub shape: Vec<usize>,
 }
 
 impl TypeData {
@@ -405,79 +715,4 @@ impl TypeData {
             TypeData::Error { id, .. } => id,
         }
     }
-}
-
-pub type Elem = Arc<ElemData>;
-
-#[derive(Clone, Debug)]
-pub enum ElemData {
-    Def(Arc<DefData>),
-    Const(Arc<ConstData>),
-    Let(Arc<LetData>),
-    Scope(Arc<ScopeData>),
-    Sete(Arc<SeteData>),
-    Defn(Arc<DefnData>),
-    Fn(Arc<FnData>),
-    Function(Arc<Function>),
-    Return(Arc<ReturnData>),
-    If(Arc<IfData>),
-    When(Arc<WhenData>),
-    Cond(Arc<CondData>),
-    Switch(Arc<SwitchData>),
-    Do(Arc<DoData>),
-    For(Arc<ForData>),
-    While(Arc<WhileData>),
-    Break(Arc<BreakData>),
-    Continue(Arc<ContinueData>),
-    Try(Arc<TryData>),
-    Throw(Arc<ThrowData>),
-    Catch(Arc<CatchData>),
-    Finally(Arc<FinallyData>),
-    Enum(Arc<Enum>),
-    Struct(Arc<Struct>),
-    Macro(Arc<Macro>),
-    Import(Arc<Import>),
-    Export(Arc<Export>),
-    Error { id: NodeId, span: Span },
-}
-
-// TODO: デストラクチャリングの高速実行
-
-#[derive(Clone, Debug)]
-pub struct DefData {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub name: Option<Sym>,
-    pub mutable: bool,
-    pub data_type: Type,
-    pub value: Expr,
-}
-
-#[derive(Clone, Debug)]
-pub struct ConstData {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub name: Sym,
-    pub mutable: bool,
-    pub data_type: Type,
-    pub value: Expr,
-}
-
-#[derive(Clone, Debug)]
-pub struct LetData {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub data_type: Option<Type>,
-    pub value: Option<Expr>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ScopeData {
-    pub id: NodeId,
-    pub span: Span,
-    pub green: GreenNode,
-    pub : Vec<Elem>,
 }
