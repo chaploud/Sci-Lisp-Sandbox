@@ -1,5 +1,10 @@
+# build directory
 target/
-scilisp-debug
-scilisp-release
-debug
-release
+
+# debug-binary symbolic link
+d-sl
+# release-binary symbolic link
+r-sl
+
+# REPL history file
+.scilisp-history.txt
