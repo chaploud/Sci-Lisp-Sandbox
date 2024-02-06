@@ -408,6 +408,8 @@ impl Parser {
         }))
     }
 
+    fn parse_sequence
+
     fn parse_vector(&mut self) -> Expr {
         let span = self.current_span();
         self.builder.start_node();

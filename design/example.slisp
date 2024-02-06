@@ -442,6 +442,9 @@ i                            ; => 4 you can access i after loop.
 #collection              ; collection
 #option[#i64]            ; option of i64
 
+;; map_key: #str, #i64, #key
+;; array: #i64, #f64, #c64 + shape
+
 ;; モジュールからインポートした型の書き方がむずい
 ;; #module/type, module/#type どうすべきか...後者かな
 
@@ -524,6 +527,8 @@ i                            ; => 4 you can access i after loop.
 ;; 他のモジュールで定義された型の利用
 ;; 強力な型推論
 
+;; test
+;; assert
 ;; Polars binding
 ;; Parallel(thread, coroutine, async)
 ;; SIMD
