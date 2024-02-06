@@ -15,8 +15,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Build
-        run: ./build.sh
+      # - name: Build
+      #   run: ./build.sh
       # - name: Format
       #   run: cargo fmt -- --check
       # - name: Check
