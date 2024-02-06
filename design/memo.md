@@ -40,3 +40,35 @@ https://github.com/dinfuehr/dora
 - 16万行
 - 命令セットにいたるまですべて自前で実装している感じ
 - bytecodeをwasmにすればいいと思う
+
+### 処理の流れ
+
+- どのように処理実行しているかの流れだけでもつかめ
+
+- dora/src/main.rs
+  - driver::start()
+- dora/src/driver/start.rs
+  - start()
+    - cmd::parse_arguments()
+    - compile_into_program()
+      - Sema::new() ... Semaphoreかな? -> sm
+      - Semaがメモリ上でのデータ構造すべてもっている感じか
+    - language::check_program(); -> ast
+    - language::generate_bytecode()
+    - language::emit_program() -> program
+      - language::emit_bytecode()
+    - encode_and_decode_for_testing()
+    - set_vm()
+    - run_main()
+
+- これをSci-Lispの実行に置き換えてみよう
+- 実行時引数
+  - REPL
+  - Execute File
+- semaphoreの上にlanguage::check_program -> ast
+- semaphoreからgenerate_bytecode -> wasm
+- wasmetimeで実行
+
+- メモリアリーナ・アリーナメモリアロケータ
+- まずはsemaを読んで、どのようにASTを保持したいのかを理解してみる
+
