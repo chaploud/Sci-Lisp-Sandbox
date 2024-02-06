@@ -88,6 +88,11 @@ pub fn repl() -> Result<(), Box<dyn std::error::Error>> {
                 if line.trim().is_empty() {
                     continue;
                 }
+
+                // lex and parse to ast
+                // represent ast on arena
+                // compile ast to wasm bytecode
+                // run wasm bytecode on vm
             }
         };
     }

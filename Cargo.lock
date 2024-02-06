@@ -1128,6 +1128,7 @@ dependencies = [
  "cargo-husky",
  "clap",
  "colored",
+ "id-arena",
  "indexmap",
  "num",
  "predicates",

@@ -11,9 +11,9 @@ use clap::Parser;
 use cli::execute::execute;
 use cli::repl::repl;
 
+mod analyzer;
 mod cli;
 mod compiler;
-mod frontend;
 // mod parser;
 mod vm;
 
