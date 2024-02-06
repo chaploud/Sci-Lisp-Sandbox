@@ -29,7 +29,8 @@ inf                 ; f64: positive infinity
 ;; if, when, cond, switch,
 ;; while, for, break, continue
 ;; try, catch, finally, throw,
-;; import
+;; import, export
+;; typedef
 
 ;; ===== Spceial Marks (cannot use in symbol name)
 ;; : => keyword
@@ -331,7 +332,6 @@ i                            ; => 4 you can access i after loop.
 (struct Enemy                       ; define struct
   "Enemy Struct"                    ; docstring
   [hp]
-  :method
   (defn heal [self x]               ; define method inside of struct
     (set! self.hp (+ self.hp x))))
 
@@ -346,14 +346,35 @@ i                            ; => 4 you can access i after loop.
 (slime.damage 10)                   ; call method (allow this style)
 (print slime.hp)                    ; => 10 (allow this style)
 
+(struct ChildEnemy => Enemy         ; inherit struct
+  "ChildEnemy Struct"
+  [mp]
+
+  (defn ChildEnemy [self hp mp]     ; you can define constructor(Same as struct name)
+    (set! self.hp hp)
+    (set! self.mp mp)))
+
+  (defn magic [self x]
+    (set! self.mp (- self.mp x)))
+
+(def slime-child
+  (ChildEnemy {:hp 20, :mp 10}))    ; using struct
+
+(slime-child.magic 5)               ; call method
+(slime-child.damage 5)              ; call parent method
+
+(ancestor slime-child)              ; => [Enemy] show all ancestor
+(ancestor ChildEnemy)               ; => [Enemy]
+(ancestor #ChildEnemy)              ; => [#Enemy]
+
 ;; ===== macro
 (macro my-and                     ; define macro
   "Evaluates exprs one at time,
    from left to right."           ; docstring
   ([] true)                       ; multi arity
   ([x] x)
-  ([x & next]                ; variable length argument (& rest)
-    `(let [and# ~x]          ; quote(`) and unquote(~)
+  ([x & next]                     ; variable length argument (& rest)
+    `(let [and# ~x]               ; quote(`) and unquote(~)
        (if and#                   ; auto-gensym(xxx#)
          (my-and ~@next)          ; unquote splicing(~@)
          and#))))
@@ -445,9 +466,6 @@ i                            ; => 4 you can access i after loop.
 ;; map_key: #str, #i64, #key
 ;; array: #i64, #f64, #c64 + shape
 
-;; モジュールからインポートした型の書き方がむずい
-;; #module/type, module/#type どうすべきか...後者かな
-
 ;; ===== User Defined Type
 (enum Color                         ; define enum
   "Color enum"
@@ -461,6 +479,10 @@ i                            ; => 4 you can access i after loop.
    y #i64])
 
 (def p #Point (Point {:x 1, :y 2})) ; using struct type: Point
+
+(typedef #int #i64)                 ; typedef (type alias)
+(typedef #map-key
+  (union #i64 #str #key))           ; union of i64, string, keyword
 
 ;; ===== Type hierarchy
 ;; #any is super type of all types
@@ -492,6 +514,7 @@ i                            ; => 4 you can access i after loop.
 
 (import string :as str)               ; import with alias
 (str/shouty-snake "abcDef")           ; => "ABC_DEF"
+(def sss str/#template "{:.2}")       ; use type defiend in module
 
 (import string [shouty-snake          ; import with select
                 train-case])
@@ -522,7 +545,6 @@ i                            ; => 4 you can access i after loop.
 ([|, 1|2] a)                          ; => [[[2], [5]], [[3], [6]]]
 
 ;; ===== Scientific Constants
-
 
 ;; 他のモジュールで定義された型の利用
 ;; 強力な型推論
