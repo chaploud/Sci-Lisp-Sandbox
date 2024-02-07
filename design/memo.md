@@ -72,3 +72,50 @@ https://github.com/dinfuehr/dora
 - メモリアリーナ・アリーナメモリアロケータ
 - まずはsemaを読んで、どのようにASTを保持したいのかを理解してみる
 
+- 再帰の高速化、スタックオーバーフローしにくさ
+  - 内部でloopに変換かな
+
+## 必要なデータ構造・オブジェクト
+
+入念に読んで理解してから実装に移ろう
+
+- プログラムへの引数
+- interner: インターンするもの
+- source_file: ソースファイル情報
+- diag: エラー分析して出すもの
+- known: 既出のオブジェクト
+  - functions
+  - enums
+  - structs
+  - macros
+- aliases: モジュールエイリアス、型エイリアス
+- consts: constによるもの
+- structs: structsによるもの
+- extensions: わからん
+- fcts: defnによるもの
+- enums: enumによるもの
+- globals: グローバル変数
+- uses: importに該当するな
+  - export表現がないからどうするか
+- packages: 依存関係を表すパッケージ(まだ先か)
+- package_names: パッケージの名前、ID
+- prelude_module_id: Rustでpreludeというと、そのライブラリをがっと使えるようにするやつ
+- stdlib_module_id: モジュールID
+- program_module_id: プログラムのモジュールID->REPLでの表現は?一プロセスあたりに割り振られるかな？
+- boots_module_id: コンパイラの方式
+- stdlib_package_id: こっちはパッケージ
+- program_package_id: 〃
+- boots_package_id: 〃
+
+## Arena
+
+```rust
+pub struct Arena<T, A = DefaultArenaBehavior<T>> {
+  arena_id: u32,
+  items: Vec<T>,
+  _phantom: PhantomData<fn() -> A>
+}
+```
+
+Sema構造体内のArenaからデータをidで高速に取り出すことができるっぽい
+- メモリ上の構造を表す

@@ -14,8 +14,10 @@ use cli::repl::repl;
 mod analyzer;
 mod cli;
 mod compiler;
-// mod parser;
+mod parser;
 mod vm;
+mod structures;
+mod executor;
 
 #[derive(Parser)]
 #[command(

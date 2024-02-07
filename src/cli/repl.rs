@@ -77,19 +77,20 @@ pub fn repl() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("{}", err);
                 continue;
             }
-            Ok(line) => {
-                rl.add_history_entry(&line)?;
+            Ok(code) => {
+                rl.add_history_entry(&code)?;
 
-                if line == "exit" {
+                if code == "exit" {
                     say_goodbye();
                     break;
                 }
 
-                if line.trim().is_empty() {
+                if code.trim().is_empty() {
                     continue;
                 }
 
                 // lex and parse to ast
+                // check ast with analyzer
                 // represent ast on arena
                 // compile ast to wasm bytecode
                 // run wasm bytecode on vm
