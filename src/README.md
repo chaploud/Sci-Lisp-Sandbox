@@ -2,8 +2,8 @@
 
 ```toml
 - src: toplevel
-  - main.rs               # entry point
-  - lib/                  # standard/preload libraries
+  - main.rs               # Entry point
+  - lib/                  # Standard libraries
     - rust/               # Rust InterOp
     - std/                # Sci-Lisp Standard library
   - cli/
