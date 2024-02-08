@@ -119,3 +119,9 @@ pub struct Arena<T, A = DefaultArenaBehavior<T>> {
 
 Sema構造体内のArenaからデータをidで高速に取り出すことができるっぽい
 - メモリ上の構造を表す
+
+
+## REPLのスペシャルコマンド
+
+- %e: 直前のエラー
+- %run: 外部モジュールの実行。結果格納

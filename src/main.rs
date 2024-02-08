@@ -15,7 +15,6 @@ mod analyzer;
 mod cli;
 mod compiler;
 mod parser;
-mod vm;
 mod structures;
 mod executor;
 
