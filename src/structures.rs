@@ -1,7 +1,8 @@
-pub mod types;
 pub mod errors;
 pub mod ast;
 pub mod arena;
+pub mod objects;
+pub mod definitions;
 
 use errors::Error;
 
