@@ -1,0 +1,68 @@
+COMMENT = _{ ";" ~ (!NEWLINE ~ ANY)* ~ (NEWLINE | EOI)}
+ws = _{ " " | "\t" | "\r" | "\n" | "," }
+
+prefix_char = _{ "'" | "`" | "~" | "~@" | "@" | "\\" | ":" | "#" }
+special_char = _{ "!" | "$" | "%" | "&" | "-" | "=" | "^" | "+" | "*" | "<" | ">" | "?" | "_" | "/" }
+separation_char = _{ "." | "|" }
+
+identifier = _{ ( ASCII_ALPHA | special_char) ~ (ASCII_ALPHANUMERIC | special_char)*}
+
+// atom
+nil = @{ "nil" ~ !"?" }
+bool = @{ ("true" | "false") ~ !"?" }
+f64 = @{ int ~ "." ~ int? ~ exp?
+       | int ~ exp                                  // -0_2e+02
+       | pm? ~ "." ~ digit ~ (digit | "_")* ~ exp?  // -.0_0e5
+       | nan
+       | inf }
+i64 = @{ int ~ !("." | ^"e") }
+  int = _{ pm? ~ digit ~ (digit | "_")* }
+  digit = _{ ASCII_DIGIT }
+  pm = _{ ("-" | "+") }
+  exp = _{ ^"e" ~ i64 }
+  nan = _{ "nan" }
+  inf = _{ pm? ~ "inf" }
+symbol = @{ identifier }
+keyword = @{ ":" ~ identifier}
+
+// string
+regex = { "#\"" ~ string_inner ~ "\"" }
+string = { "\"" ~ string_inner ~ "\"" }
+  string_inner = { char* }
+  char = _{ !("\"" | "\\") ~ ANY | "\\" ~ ANY }
+
+// collection
+list = { "(" ~ ws* ~ collection_inner ~ ws* ~ ")" | empty_list }
+vector = { "[" ~ ws* ~ collection_inner ~ ws* ~ "]" | empty_vector }
+map = { "{" ~ ws* ~ collection_inner ~ ws* ~ "}" | empty_map }
+set = { "#{" ~ ws* ~ collection_inner ~ ws* ~ "}" | empty_set }
+  collection_inner = _{ expr ~ (ws+ ~ expr)* }
+  empty_list = _{ "(" ~ ws* ~ ")" }
+  empty_vector = _{ "[" ~ ws* ~ "]" }
+  empty_map = _{ "{" ~ ws* ~ "}" }
+  empty_set = _{ "#{" ~ ws* ~ "}" }
+
+// quotes
+quote = { "'" ~ expr }
+syntax_quote = { "`" ~ expr }
+unquote = { "~" ~ expr }
+unquote_splicing = { "~@" ~ expr }
+
+// slice
+slice = { slice_start? ~ "|" ~ slice_end? ~ ("|" ~ slice_step?)? }
+slice_start = { slice_member }
+slice_end = { slice_member }
+slice_step = { slice_member }
+slice_member = _{ nil | i64 | symbol | quote | list | syntax_quote | unquote | unquote_splicing }
+// TODO: other slice member such as syntax_quote
+
+expr = _{ slice | nil | bool | i64 | f64 | symbol | keyword | regex | string
+        | list | vector | map | set
+        | quote | syntax_quote | unquote | unquote_splicing }
+
+// top level
+scilisp = { SOI ~ ws* ~ scilisp_inner* ~ ws* ~ EOI }
+  scilisp_inner = { expr ~ (ws+ ~ expr)* }
+
+// TODO:
+// (symbol.member) dot
