@@ -1,3 +1,5 @@
+/* structures/tokens.rs */
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone)]
 #[allow(non_camel_case_types)]
 #[repr(u8)]

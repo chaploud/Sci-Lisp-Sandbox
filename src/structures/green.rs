@@ -1,7 +1,7 @@
 use std::io;
 use std::sync::Arc;
 
-use crate::TokenKind;
+use crate::structures::tokens::TokenKind;
 
 pub type GreenNode = Arc<GreenNodeData>;
 
@@ -15,7 +15,6 @@ impl From<GreenNode> for GreenElement {
         GreenElement::Node(value)
     }
 }
-
 
 impl GreenElement {
     pub fn kind(&self) -> TokenKind {
@@ -66,31 +65,6 @@ impl GreenNodeData {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct GreenTokenData {
-    kind: TokenKind,
-    len: u32,
-    value: String,
-}
-
-impl GreenTokenData {
-    pub fn new(kind: TokenKind, len: u32, value: String) -> GreenTokenData {
-        GreenTokenData { kind, len, value }
-    }
-
-    pub fn kind(&self) -> TokenKind {
-        self.kind
-    }
-
-    pub fn len(&self) -> u32 {
-        self.len
-    }
-
-    pub fn value(&self) -> &str {
-        self.value.as_str()
-    }
-}
-
 pub struct GreenTreeBuilder {
     nodes: Vec<(usize, u32)>,
     children: Vec<GreenElement>,
@@ -117,22 +91,12 @@ impl GreenTreeBuilder {
         }
     }
 
-    pub fn token(&mut self, kind: TokenKind, value: String) {
-        assert!(kind < TokenKind::EOF);
-        let len = value.len().try_into().expect("overflow");
-        self.offset += len;
-        self.children
-            .push(Arc::new(GreenTokenData::new(kind, len, value)).into());
-    }
-
     pub fn finish_node(&mut self, kind: TokenKind) -> GreenNode {
-        assert!(kind > TokenKind::EOF);
         let (children_start, start) = self.nodes.pop().expect("missing node start");
         self.finish_node_common(kind, children_start, start)
     }
 
     pub fn finish_node_starting_at(&mut self, kind: TokenKind, marker: Marker) -> GreenNode {
-        assert!(kind > TokenKind::EOF);
         let children_start = marker.children;
         let start = marker.offset;
         self.finish_node_common(kind, children_start, start)
