@@ -33,7 +33,7 @@ pub enum TokenKind {
     SWITCH_KW,
     FOR_KW,
     WHILE_KW,
-    BRWAK_KW,
+    BREAK_KW,
     CONTINUE_KW,
     ENUM_KW,
     STRUCT_KW,
@@ -59,6 +59,8 @@ pub enum TokenKind {
     SPLICING,
     // Type Annotation
     TYPE_ANNOTATION,
+    // Auto GenSym
+    AUTO_GENSYM,
     // Semantic
     CALL,
     MODULE_PATH,

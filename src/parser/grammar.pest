@@ -1,68 +1,139 @@
 COMMENT = _{ ";" ~ (!NEWLINE ~ ANY)* ~ (NEWLINE | EOI)}
 ws = _{ " " | "\t" | "\r" | "\n" | "," }
 
-prefix_char = _{ "'" | "`" | "~" | "~@" | "@" | "\\" | ":" | "#" }
-special_char = _{ "!" | "$" | "%" | "&" | "-" | "=" | "^" | "+" | "*" | "<" | ">" | "?" | "_" | "/" }
-separation_char = _{ "." | "|" }
+prefix_char = _{ "'" | "`" | "~" | "~@" | "@" | ":" }
+special_char = _{ "!" | "$" | "%" | "-" | "=" | "^" | "+" | "*" | "<" | ">" | "?" | "_" | "\\"}
+separation_char = _{ "." | "|" | "/" | "&" }
 
-identifier = _{ ( ASCII_ALPHA | special_char) ~ (ASCII_ALPHANUMERIC | special_char)*}
+identifier = _{ ( ASCII_ALPHA | special_char) ~ (ASCII_ALPHANUMERIC | special_char)*
+              | "/"
+              | "//"}
 
-// atom
+// nil
 nil = @{ "nil" ~ !"?" }
+// bool
 bool = @{ ("true" | "false") ~ !"?" }
+
+int = _{ pm? ~ digit ~ (digit | "_")* }
+digit = _{ ASCII_DIGIT }
+pm = _{ ("-" | "+") }
+exp = _{ ^"e" ~ i64 }
+nan = _{ "nan" }
+inf = _{ pm? ~ "inf" }
+pmint = _{ pm ~ digit ~ (digit | "_")* }
+pmi64 = @{ pmint ~ !("." | ^"e") }
+pmf64 = @{ pmint ~ "." ~ int? ~ exp?
+         | pmint ~ exp
+         | pm ~ "." ~ digit ~ (digit | "_")* ~ exp? }
+
+// f64
 f64 = @{ int ~ "." ~ int? ~ exp?
        | int ~ exp                                  // -0_2e+02
        | pm? ~ "." ~ digit ~ (digit | "_")* ~ exp?  // -.0_0e5
        | nan
        | inf }
+// i64
 i64 = @{ int ~ !("." | ^"e") }
-  int = _{ pm? ~ digit ~ (digit | "_")* }
-  digit = _{ ASCII_DIGIT }
-  pm = _{ ("-" | "+") }
-  exp = _{ ^"e" ~ i64 }
-  nan = _{ "nan" }
-  inf = _{ pm? ~ "inf" }
+
+// c64
+c64 = @{ (f64 | i64) ~ "j"
+       | (f64 | i64) ~ (pmf64 | pmi64) ~ "j"}
+
+// symbol
 symbol = @{ identifier }
+
+// keyword
 keyword = @{ ":" ~ identifier}
 
-// string
+string_inner = { char* }
+char = _{ !("\"" | "\\") ~ ANY | "\\" ~ ANY }
+
+// regex
 regex = { "#\"" ~ string_inner ~ "\"" }
+
+// string
 string = { "\"" ~ string_inner ~ "\"" }
-  string_inner = { char* }
-  char = _{ !("\"" | "\\") ~ ANY | "\\" ~ ANY }
+
+collection_inner = _{ expr ~ (ws+ ~ expr)* }
+empty_list = _{ "(" ~ ws* ~ ")" }
+empty_vector = _{ "[" ~ ws* ~ "]" }
+empty_map = _{ "{" ~ ws* ~ "}" }
+empty_set = _{ "#{" ~ ws* ~ "}" }
+empty_array = _{ "#[" ~ ws* ~ "]" }
 
 // collection
 list = { "(" ~ ws* ~ collection_inner ~ ws* ~ ")" | empty_list }
 vector = { "[" ~ ws* ~ collection_inner ~ ws* ~ "]" | empty_vector }
 map = { "{" ~ ws* ~ collection_inner ~ ws* ~ "}" | empty_map }
 set = { "#{" ~ ws* ~ collection_inner ~ ws* ~ "}" | empty_set }
-  collection_inner = _{ expr ~ (ws+ ~ expr)* }
-  empty_list = _{ "(" ~ ws* ~ ")" }
-  empty_vector = _{ "[" ~ ws* ~ "]" }
-  empty_map = _{ "{" ~ ws* ~ "}" }
-  empty_set = _{ "#{" ~ ws* ~ "}" }
+array = { "#[" ~ ws* ~ collection_inner ~ ws* ~ "]" | empty_array }
 
-// quotes
+// Reader Macros
 quote = { "'" ~ expr }
 syntax_quote = { "`" ~ expr }
 unquote = { "~" ~ expr }
 unquote_splicing = { "~@" ~ expr }
+splicing = { "@" ~ expr } // これ多分うまくいかない
 
 // slice
 slice = { slice_start? ~ "|" ~ slice_end? ~ ("|" ~ slice_step?)? }
 slice_start = { slice_member }
 slice_end = { slice_member }
 slice_step = { slice_member }
-slice_member = _{ nil | i64 | symbol | quote | list | syntax_quote | unquote | unquote_splicing }
-// TODO: other slice member such as syntax_quote
+slice_member = _{ nil | i64 | symbol | quote | list | syntax_quote | unquote }
 
-expr = _{ slice | nil | bool | i64 | f64 | symbol | keyword | regex | string
-        | list | vector | map | set
-        | quote | syntax_quote | unquote | unquote_splicing }
+// Type Annotation
+type_annotation = @{ "#" ~ symbol }
+
+// Auto GenSym
+auto_gensym = @{ symbol ~ "#" }
+
+// Module Path
+module_path = @{ symbol ~ (slash ~ symbol)* }
+slash = _{ "/" }
+
+// Instance
+instance = @{ symbol ~ (dot ~ symbol)* }
+dot = _{ "." }
+
+// And
+and = @{ "&" }
+
+// special forms keywords
+def_kw = @{ "def" }
+const_kw = @{ "const" }
+let_kw = @{ "let" }
+sete_kw = @{ "set!" }
+defn_kw = @{ "defn" }
+return_kw = @{ "return" }
+fn_kw = @{ "fn" }
+when_kw = @{ "when" }
+do_kw = @{ "do" }
+cond_kw = @{ "cond" }
+switch_kw = @{ "switch" }
+for_kw = @{ "for" }
+while_kw = @{ "while" }
+break_kw = @{ "break" }
+continue_kw = @{ "continue" }
+enum_kw = @{ "enum" }
+struct_kw = @{ "struct" }
+method_kw = @{ "method" }
+self_kw = @{ "self" }
+macro_kw = @{ "macro" }
+try_kw = @{ "try" }
+throw_kw = @{ "throw" }
+catch_kw = @{ "catch" }
+finally_kw = @{ "finally" }
+typedef_kw = @{ "typedef" }
+import_kw = @{ "import" }
+export_kw = @{ "export" }
+
+expr = _{ slice | nil | bool | i64 | f64 | c64
+        | symbol | keyword | regex | string
+        | list | vector | map | set | array
+        | quote | syntax_quote | unquote | unquote_splicing | splicing
+        | type_annotation | auto_gensym | module_path | instance | and }
 
 // top level
 scilisp = { SOI ~ ws* ~ scilisp_inner* ~ ws* ~ EOI }
   scilisp_inner = { expr ~ (ws+ ~ expr)* }
-
-// TODO:
-// (symbol.member) dot

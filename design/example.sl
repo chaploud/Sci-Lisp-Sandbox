@@ -45,7 +45,6 @@ inf                 ; f64: positive infinity
 ;; | => slice
 ;; / => namespace(module)
 ;; & => rest(variable length argument), keyword argument
-
 ;; #i64 => type annotation (prefix)
 ;; local# => auto-gensym (suffix)
 
