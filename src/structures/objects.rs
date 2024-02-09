@@ -1,3 +1,6 @@
+use crate::structures::span::Span;
+use crate::structures::ast::NodeId;
+
 // Sci-Lisp types
 type Bool = bool;
 type I64 = i64;
@@ -14,11 +17,14 @@ type Datetime = chrono::DateTime<chrono::Utc>;
 type Duraton = chrono::Duration;
 type OptionType<T> = Option<T>;
 
+#[derive(Clone, Debug)]
 pub struct Keyword {
+    pub id: NodeId,
     pub name: Str,
 }
 
 pub struct Symbol {
+    pub span: Span,
     pub name: Str,
 }
 
