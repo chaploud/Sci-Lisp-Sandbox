@@ -10,3 +10,15 @@ use crate::structures::errors::Error;
 #[derive(Parser)]
 #[grammar = "parser/grammar.pest"]
 pub struct Parser;
+
+pub fn parse(code: &str) {
+    let result = Parser::parse(Rule::scilisp, code);
+    match result {
+        Ok(pairs) => {
+            println!("{:?}", pairs);
+        }
+        Err(e) => {
+            println!("{}", e);
+        }
+    }
+}

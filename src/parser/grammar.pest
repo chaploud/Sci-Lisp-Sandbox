@@ -5,9 +5,7 @@ prefix_char = _{ "'" | "`" | "~" | "~@" | "@" | ":" }
 special_char = _{ "!" | "$" | "%" | "-" | "=" | "^" | "+" | "*" | "<" | ">" | "?" | "_" | "\\"}
 separation_char = _{ "." | "|" | "/" | "&" }
 
-identifier = _{ ( ASCII_ALPHA | special_char) ~ (ASCII_ALPHANUMERIC | special_char)*
-              | "/"
-              | "//"}
+identifier = _{ ( ASCII_ALPHA | special_char) ~ (ASCII_ALPHANUMERIC | special_char)* }
 
 // nil
 nil = @{ "nil" ~ !"?" }
@@ -21,8 +19,8 @@ exp = _{ ^"e" ~ i64 }
 nan = _{ "nan" }
 inf = _{ pm? ~ "inf" }
 pmint = _{ pm ~ digit ~ (digit | "_")* }
-pmi64 = @{ pmint ~ !("." | ^"e") }
-pmf64 = @{ pmint ~ "." ~ int? ~ exp?
+pmi64 = _{ pmint ~ !("." | ^"e") }
+pmf64 = _{ pmint ~ "." ~ int? ~ exp?
          | pmint ~ exp
          | pm ~ "." ~ digit ~ (digit | "_")* ~ exp? }
 
@@ -40,7 +38,7 @@ c64 = @{ (f64 | i64) ~ "j"
        | (f64 | i64) ~ (pmf64 | pmi64) ~ "j"}
 
 // symbol
-symbol = @{ identifier }
+symbol = @{ identifier | "/" | "//" }
 
 // keyword
 keyword = @{ ":" ~ identifier}
@@ -82,19 +80,22 @@ slice_end = { slice_member }
 slice_step = { slice_member }
 slice_member = _{ nil | i64 | symbol | quote | list | syntax_quote | unquote }
 
+sharp = @{ "#" }
+slash = @{ "/" }
+dot = @{ "." }
+
 // Type Annotation
-type_annotation = @{ "#" ~ symbol }
+type_annotation = @{ sharp ~ symbol ~  generics? }
+generics = { "[" ~ ws* ~ type_annotation ~ (ws+ ~ type_annotation)* ~ ws* ~ "]"}
 
 // Auto GenSym
-auto_gensym = @{ symbol ~ "#" }
+auto_gensym = @{ symbol ~ sharp }
 
 // Module Path
 module_path = @{ symbol ~ (slash ~ symbol)* }
-slash = _{ "/" }
 
 // Instance
 instance = @{ symbol ~ (dot ~ symbol)* }
-dot = _{ "." }
 
 // And
 and = @{ "&" }
@@ -128,11 +129,11 @@ typedef_kw = @{ "typedef" }
 import_kw = @{ "import" }
 export_kw = @{ "export" }
 
-expr = _{ slice | nil | bool | i64 | f64 | c64
+expr = _{ type_annotation | auto_gensym | module_path | instance | and
+        | slice | nil | bool | i64 | f64 | c64
         | symbol | keyword | regex | string
         | list | vector | map | set | array
-        | quote | syntax_quote | unquote | unquote_splicing | splicing
-        | type_annotation | auto_gensym | module_path | instance | and }
+        | quote | syntax_quote | unquote_splicing | unquote |  splicing }
 
 // top level
 scilisp = { SOI ~ ws* ~ scilisp_inner* ~ ws* ~ EOI }

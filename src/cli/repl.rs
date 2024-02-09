@@ -10,6 +10,8 @@ use rustyline::validate::MatchingBracketValidator;
 use rustyline::{CompletionType, Config, EditMode, Editor};
 use rustyline_derive::{Completer, Helper, Hinter, Validator};
 
+use crate::parser::parse;
+
 const HISTORY_FILE: &str = "./.scilisp-history.txt";
 
 #[derive(Helper, Hinter, Validator, Completer)]
@@ -88,6 +90,8 @@ pub fn repl() -> Result<(), Box<dyn std::error::Error>> {
                 if code.trim().is_empty() {
                     continue;
                 }
+
+                parse(&code);
 
                 // lex and parse to ast
                 // check ast with analyzer
