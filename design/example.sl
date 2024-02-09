@@ -22,6 +22,8 @@ inf                 ; f64: positive infinity
 ;; falsy value is only 'false' and 'nil'
 ;; "", '(), [], {}, #{}, 0, nan => all truthy"
 
+;; Sci-Lisp is Lisp-2 (function and variable has different namespace)
+
 ;; ===== Keywords (cannot use as symbol name)
 ;; false, true, nil,
 ;; def, const, set!,
@@ -53,7 +55,7 @@ inf                 ; f64: positive infinity
 [1.0, 2.0, 3.0]              ; vector
 {:a "a", :b "b", :c "c"}     ; map (holds the insersion order)
 #{:a, :b, :c}                ; set (holds the insersion order)
-(array [1, 2, 3])            ; array of i64 (like numpy)
+#[1, 2, 3]                   ; array of i64 (like numpy)
 ;; NOTE: map key must be string, i64, keyword
 
 ;; ===== Datetime
@@ -314,6 +316,7 @@ i                            ; => 4 you can access i after loop.
 (->> 1 (+ 2) (/ 6))                   ; thread last => 2
 ; ((partial * 10) 1)                  ; partial(WIP) => 10
 ; ((comp str +) 7 8 9)                ; comp(WIP) => "24"
+; transduce(WIP)
 
 ;; ******************* WIP **********************
 ;; ===== enum
@@ -332,11 +335,11 @@ i                            ; => 4 you can access i after loop.
 (struct Enemy                       ; define struct
   "Enemy Struct"                    ; docstring
   [hp]
-  (defn heal [self x]               ; define method inside of struct
+  (defn heal [self, x]               ; define method inside of struct
     (set! self.hp (+ self.hp x))))
 
 (method [Enemy]                     ; define method outside of struct
-  (defn damage [self x]             ; TODO: Constructor
+  (defn damage [self, x]             ; TODO: Constructor
     (set! self.hp (- self.hp x))))
 
 (def slime
@@ -350,11 +353,11 @@ i                            ; => 4 you can access i after loop.
   "ChildEnemy Struct"
   [mp]
 
-  (defn ChildEnemy [self hp mp]     ; you can define constructor(Same as struct name)
+  (defn ChildEnemy [self, hp mp]     ; you can define constructor(Same as struct name)
     (set! self.hp hp)
     (set! self.mp mp)))
 
-  (defn magic [self x]
+  (defn magic [self, x]
     (set! self.mp (- self.mp x)))
 
 (def slime-child
@@ -529,8 +532,8 @@ i                            ; => 4 you can access i after loop.
 (export [somefunc])                   ; export function
 
 ;; ===== Array API
-(def a (array [[1, 2, 3],             ; 2d-array of i64
-               [4, 5, 6]]))
+(def a #[[1, 2, 3],                   ; 2d-array of i64
+         [4, 5, 6]])                  ; (array [[1,2,3], [4,5,6]]) is also OK
 (a/shape a)                           ; => [3, 3]
 (a/reshape a [1, 6])                  ; => [[1, 2, 3, 4, 5, 6]]
 (a/zeros [2, 3])                      ; => [[0, 0, 0], [0, 0, 0]]
