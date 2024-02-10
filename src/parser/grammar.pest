@@ -25,17 +25,17 @@ pmf64 = _{ pmint ~ "." ~ int? ~ exp?
          | pm ~ "." ~ digit ~ (digit | "_")* ~ exp? }
 
 // f64
-f64 = @{ int ~ "." ~ int? ~ exp?
-       | int ~ exp                                  // -0_2e+02
-       | pm? ~ "." ~ digit ~ (digit | "_")* ~ exp?  // -.0_0e5
-       | nan
-       | inf }
+f64 = @{( int ~ "." ~ int? ~ exp?
+        | int ~ exp                                  // -0_2e+02
+        | pm? ~ "." ~ digit ~ (digit | "_")* ~ exp?  // -.0_0e5
+        | nan
+        | inf )}
 // i64
 i64 = @{ int ~ !("." | ^"e") }
 
 // c64
-c64 = @{ (f64 | i64) ~ "j"
-       | (f64 | i64) ~ (pmf64 | pmi64) ~ "j"}
+c64 = @{ (f64 | i64) ~ (pmf64 | pmi64) ~ "j"
+        | (f64 | i64) ~ "j"}
 
 // symbol
 symbol = @{ identifier | "/" | "//" }
@@ -92,10 +92,10 @@ generics = { "[" ~ ws* ~ type_annotation ~ (ws+ ~ type_annotation)* ~ ws* ~ "]"}
 auto_gensym = @{ symbol ~ sharp }
 
 // Module Path
-module_path = @{ symbol ~ (slash ~ symbol)* }
+module_path = @{ (symbol ~ !("/" | "//")) ~ slash }
 
-// Instance
-instance = @{ symbol ~ (dot ~ symbol)* }
+// Instance access
+instance = @{ symbol ~ dot }
 
 // And
 and = @{ "&" }
@@ -129,8 +129,8 @@ typedef_kw = @{ "typedef" }
 import_kw = @{ "import" }
 export_kw = @{ "export" }
 
-expr = _{ type_annotation | auto_gensym | module_path | instance | and
-        | slice | nil | bool | i64 | f64 | c64
+expr = _{ slice | nil | bool | c64 | f64 | i64
+        | type_annotation | auto_gensym | module_path | instance | and
         | symbol | keyword | regex | string
         | list | vector | map | set | array
         | quote | syntax_quote | unquote_splicing | unquote |  splicing }
