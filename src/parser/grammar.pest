@@ -2,8 +2,8 @@ COMMENT = _{ ";" ~ (!NEWLINE ~ ANY)* ~ (NEWLINE | EOI)}
 ws = _{ " " | "\t" | "\r" | "\n" | "," }
 
 prefix_char = _{ "'" | "`" | "~" | "~@" | "@" | ":" }
-special_char = _{ "!" | "$" | "%" | "-" | "=" | "^" | "+" | "*" | "<" | ">" | "?" | "_" | "\\"}
-separation_char = _{ "." | "|" | "/" | "&" }
+special_char = _{ "!" | "$" | "-" | "=" | "^" | "+" | "*" | "<" | ">" | "?" | "_" | "\\"}
+separation_char = _{ "." | "|" | "/" | "&" | "%" }
 
 identifier = _{ ( ASCII_ALPHA | special_char) ~ (ASCII_ALPHANUMERIC | special_char)* }
 
@@ -29,7 +29,7 @@ f64 = @{( int ~ "." ~ digits? ~ exp? // +1.e5
         | int ~ exp                  // -0_2e+02
         | pm? ~ "." ~ digits ~ exp?  // -.0_0e5
         | nan
-        | inf ) ~ !"j" }
+        | inf ) }
 // i64
 i64 = @{ int ~ !("." | ^"e") }
 

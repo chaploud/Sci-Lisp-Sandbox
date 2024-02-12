@@ -35,7 +35,6 @@ mod tests {
         let code = r##"
         "abc\n"
         "##;
-
         for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
             match pairs.as_rule() {
                 Rule::string => (),
@@ -49,7 +48,6 @@ mod tests {
         let code = r##"
         #"[0-9]+"
         "##;
-
         for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
             match pairs.as_rule() {
                 Rule::regex => (),
@@ -64,7 +62,6 @@ mod tests {
         false
         true
         "##;
-
         for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
             match pairs.as_rule() {
                 Rule::bool => (),
@@ -78,7 +75,6 @@ mod tests {
         let code = r##"
         nil
         "##;
-
         for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
             match pairs.as_rule() {
                 Rule::nil => (),
@@ -99,7 +95,6 @@ mod tests {
         0o777
         0xffa
         "##;
-
         for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
             match pairs.as_rule() {
                 Rule::i64 => (),
@@ -128,7 +123,6 @@ mod tests {
         -inf
         -0.0
         "##;
-
         for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
             match pairs.as_rule() {
                 Rule::f64 => (),
@@ -174,10 +168,59 @@ mod tests {
         -3.e+15+1.0j
         -.2e-15+1.0j
         "##;
-
         for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
             match pairs.as_rule() {
                 Rule::c64 => (),
+                _ => panic!("{0}\n => {1}", code, i)
+            }
+        }
+    }
+
+    #[test]
+    fn test_pest_parse_08_keyword() {
+        let code = r##"
+        :keyword
+        :nil
+        "##;
+        for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
+            match pairs.as_rule() {
+                Rule::keyword => (),
+                _ => panic!("{0}\n => {1}", code, i)
+            }
+        }
+    }
+
+    #[test]
+    fn test_pest_parse_09_symbol() {
+        let code = r##"
+        sym
+        symbol
+        a12!$-=^+*<>?_\
+        "##;
+        for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
+            match pairs.as_rule() {
+                Rule::symbol => (),
+                _ => panic!("{0}\n => {1}", code, i)
+            }
+        }
+    }
+
+    #[test]
+    fn test_pest_parse_10_collection() {
+        let code = r##"
+        (1, "a", :b, sym)
+        [1, "a", :b, sym]
+        {1, "a", :b, sym}
+        #{1, "a", :b, sym}
+        #[1, 2, 3]
+        "##;
+        for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
+            match pairs.as_rule() {
+                Rule::list => if i == 0 { } else { panic!("{0}\n => {1}", code, i) },
+                Rule::vector => if i == 1 { } else { panic!("{0}\n => {1}", code, i) },
+                Rule::map => if i == 2 { } else { panic!("{0}\n => {1}", code, i) },
+                Rule::set => if i == 3 { } else { panic!("{0}\n => {1}", code, i) },
+                Rule::array => if i == 4 { } else { panic!("{0}\n => {1}", code, i) },
                 _ => panic!("{0}\n => {1}", code, i)
             }
         }
