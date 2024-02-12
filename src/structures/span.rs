@@ -2,29 +2,30 @@ use std::fmt::{Display, Error, Formatter};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Span {
-    start: u32,
-    len: u32,
+    start: usize,
+    end: usize,
 }
 
 impl Span {
-    pub fn new(start: u32, len: u32) -> Self {
-        Self { start, len }
+    pub fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
     }
 
-    pub fn at(start: u32) -> Self {
-        Self { start, len: 0 }
+    pub fn at(start: usize) -> Self {
+        let end = start;
+        Self { start, end }
     }
 
-    pub fn start(&self) -> u32 {
+    pub fn start(&self) -> usize {
         self.start
     }
 
-    pub fn len(&self) -> u32 {
-        self.len
+    pub fn len(&self) -> usize {
+        self.end - self.start
     }
 
-    pub fn end(&self) -> u32 {
-        self.start + self.len
+    pub fn end(&self) -> usize {
+        self.end
     }
 }
 

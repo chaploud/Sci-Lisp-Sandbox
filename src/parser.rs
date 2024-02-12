@@ -5,6 +5,7 @@ use pest::iterators::Pairs;
 use pest::Parser as ParserTrait;
 use pest_derive::Parser;
 
+use crate::structures::ast;
 use crate::structures::Result;
 use crate::structures::errors::Error::*;
 
@@ -12,8 +13,9 @@ use crate::structures::errors::Error::*;
 #[grammar = "parser/grammar.pest"]
 pub struct Parser;
 
-pub fn parse(code: &str) {
-    println!("{:?}", pest_parse_to_pairs(code));
+pub fn parse(code: &str) -> Result<ast::AST> {
+    let pairs = pest_parse_to_pairs(code)?;
+    let mut ast = pairs_to_ast(pairs);
 }
 
 fn pest_parse_to_pairs(code: &str) -> Result<Pairs<Rule>> {
@@ -23,6 +25,66 @@ fn pest_parse_to_pairs(code: &str) -> Result<Pairs<Rule>> {
         Err(err) => Err(ParseError(Box::new(err)))?,
     };
     Ok(inners)
+}
+
+fn pairs_to_ast(pairs: Pairs<Rule>) {
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::string => (),
+            Rule::regex => (),
+            Rule::i64 => (),
+            Rule::f64 => (),
+            Rule::c64 => (),
+            Rule::bool => (),
+            Rule::nil => (),
+            Rule::keyword => (),
+            Rule::symbol => (),
+            Rule::list => (),
+            Rule::vector => (),
+            Rule::map => (),
+            Rule::set => (),
+            Rule::array => (),
+            Rule::slice => (),
+            Rule::def_kw => (),
+            Rule::const_kw => (),
+            Rule::let_kw => (),
+            Rule::sete_kw => (),
+            Rule::defn_kw => (),
+            Rule::return_kw => (),
+            Rule::fn_kw => (),
+            Rule::when_kw => (),
+            Rule::do_kw => (),
+            Rule::cond_kw => (),
+            Rule::switch_kw => (),
+            Rule::for_kw => (),
+            Rule::while_kw => (),
+            Rule::break_kw => (),
+            Rule::continue_kw => (),
+            Rule::enum_kw => (),
+            Rule::struct_kw => (),
+            Rule::method_kw => (),
+            Rule::self_kw => (),
+            Rule::macro_kw => (),
+            Rule::try_kw => (),
+            Rule::throw_kw => (),
+            Rule::catch_kw => (),
+            Rule::finally_kw => (),
+            Rule::typedef_kw => (),
+            Rule::import_kw => (),
+            Rule::export_kw => (),
+            Rule::dot => (),
+            Rule::slash => (),
+            Rule::and => (),
+            Rule::quote => (),
+            Rule::syntax_quote => (),
+            Rule::unquote => (),
+            Rule::unquote_splicing => (),
+            Rule::splicing => (),
+            Rule::type_annotation => (),
+            Rule::EOI => (),
+            _ => (),
+        }
+    }
 }
 
 #[cfg(test)]
