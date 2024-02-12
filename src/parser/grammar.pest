@@ -12,30 +12,30 @@ nil = @{ "nil" ~ !"?" }
 // bool
 bool = @{ ("true" | "false") ~ !"?" }
 
-int = _{ pm? ~ digit ~ (digit | "_")* }
-digit = _{ ASCII_DIGIT }
+int = _{ pm? ~ digits }
+digits = _{ ASCII_DIGIT ~ (ASCII_DIGIT | "_")* }
 pm = _{ ("-" | "+") }
 exp = _{ ^"e" ~ i64 }
 nan = _{ "nan" }
 inf = _{ pm? ~ "inf" }
-pmint = _{ pm ~ digit ~ (digit | "_")* }
+pmint = _{ pm ~ digits }
 pmi64 = _{ pmint ~ !("." | ^"e") }
 pmf64 = _{ pmint ~ "." ~ int? ~ exp?
          | pmint ~ exp
-         | pm ~ "." ~ digit ~ (digit | "_")* ~ exp? }
+         | pm ~ "." ~ digits ~ exp? }
 
 // f64
-f64 = @{( int ~ "." ~ int? ~ exp?
-        | int ~ exp                                  // -0_2e+02
-        | pm? ~ "." ~ digit ~ (digit | "_")* ~ exp?  // -.0_0e5
+f64 = @{( int ~ "." ~ digits? ~ exp? // +1.e5
+        | int ~ exp                  // -0_2e+02
+        | pm? ~ "." ~ digits ~ exp?  // -.0_0e5
         | nan
-        | inf )}
+        | inf ) ~ !"j" }
 // i64
 i64 = @{ int ~ !("." | ^"e") }
 
 // c64
 c64 = @{ (f64 | i64) ~ (pmf64 | pmi64) ~ "j"
-        | (f64 | i64) ~ "j"}
+        |(f64 | i64) ~ "j" }
 
 // symbol
 symbol = @{ identifier | "/" | "//" }

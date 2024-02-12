@@ -2,9 +2,9 @@
 target/
 
 # debug-binary symbolic link
-d-sl
+dsl
 # release-binary symbolic link
-r-sl
+rsl
 
 # REPL history file
 .scilisp-history.txt
