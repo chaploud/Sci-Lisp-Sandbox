@@ -551,6 +551,7 @@ i                            ; => 4 you can access i after loop.
 
 ;; 他のモジュールで定義された型の利用
 ;; 強力な型推論
+;; 総称関数は基本的には同名のmethodを呼び出す
 
 ;; test
 ;; assert

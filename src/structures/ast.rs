@@ -2,6 +2,19 @@ use std::{fmt, sync::Arc};
 
 use crate::structures::span::Span;
 
+use super::errors::Error;
+
+// parser -> token & span & structuer
+// -> parse_hoge -> node形成(Stack, つながり、箇所、構造) -> ast形成
+// stackをポップしていくだけで処理が進む
+
+pub struct AST {
+    pub next_node_id: usize,
+    pub nodes: Vec<Expr>,
+    pub spans: Vec<Span>,
+    pub errors: Vec<Error>,
+}
+
 #[derive(PartialEq, Eq, Copy, Clone, Debug, Hash)]
 pub struct NodeId(pub usize);
 

@@ -4,7 +4,6 @@ pub mod arena;
 pub mod objects;
 pub mod definitions;
 pub mod span;
-pub mod green;
 pub mod tokens;
 
 use errors::Error;

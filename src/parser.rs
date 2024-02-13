@@ -7,6 +7,7 @@ use pest_derive::Parser;
 
 use crate::structures::ast;
 use crate::structures::Result;
+use crate::structures::green::{GreenNode, GreenNodeData, GreenElement, GreenTreeBuilder};
 use crate::structures::errors::Error::*;
 
 #[derive(Parser)]
@@ -15,7 +16,17 @@ pub struct Parser;
 
 pub fn parse(code: &str) -> Result<ast::AST> {
     let pairs = pest_parse_to_pairs(code)?;
-    let mut ast = pairs_to_ast(pairs);
+
+    let mut ast = ast::AST {
+        next_node_id: 0,
+        nodes: Vec::new(),
+        spans: Vec::new(),
+        errors: Vec::new(),
+    };
+    ast.builder.start_node();
+
+    pairs_to_ast(pairs, &mut ast);
+    Ok(ast)
 }
 
 fn pest_parse_to_pairs(code: &str) -> Result<Pairs<Rule>> {
@@ -27,7 +38,8 @@ fn pest_parse_to_pairs(code: &str) -> Result<Pairs<Rule>> {
     Ok(inners)
 }
 
-fn pairs_to_ast(pairs: Pairs<Rule>) {
+fn pairs_to_ast(pairs: Pairs<Rule>, ast: &mut ast::AST) {
+    let mut ast =
     for pair in pairs {
         match pair.as_rule() {
             Rule::string => (),
@@ -287,4 +299,5 @@ mod tests {
             }
         }
     }
+    // TODO: type_annotation, dot, slash, and, quote, syntax_quote, unquote, unquote_splicing, splicing
 }
