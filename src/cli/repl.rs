@@ -91,7 +91,7 @@ pub fn repl() -> Result<(), Box<dyn std::error::Error>> {
                     continue;
                 }
 
-                parse(&code);
+                println!("{:?}", parse(&code));
 
                 // lex and parse to ast
                 // check ast with analyzer

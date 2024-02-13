@@ -92,20 +92,22 @@ generics = { "[" ~ ws* ~ type_annotation ~ (ws+ ~ type_annotation)* ~ ws* ~ "]"}
 auto_gensym = @{ symbol ~ sharp }
 
 // Module Path
-module_path = @{ (symbol ~ !("/" | "//")) ~ slash }
+module = @{ path+ ~ symbol }
+path = @{ identifier ~ slash }
 
-// Instance access
-instance = @{ symbol ~ dot }
+// Member Access
+member = @{ (access+ | dot) ~ symbol}
+access = @{ symbol ~ dot }
 
 // And
 and = @{ "&" }
 
 // special forms keywords
+defn_kw = @{ "defn" }
 def_kw = @{ "def" }
 const_kw = @{ "const" }
 let_kw = @{ "let" }
 sete_kw = @{ "set!" }
-defn_kw = @{ "defn" }
 return_kw = @{ "return" }
 fn_kw = @{ "fn" }
 when_kw = @{ "when" }
@@ -129,8 +131,13 @@ typedef_kw = @{ "typedef" }
 import_kw = @{ "import" }
 export_kw = @{ "export" }
 
-expr = _{ slice | nil | bool | c64 | f64 | i64
-        | type_annotation | auto_gensym | module_path | instance | and
+expr = _{ defn_kw |def_kw | const_kw | let_kw | sete_kw | return_kw | fn_kw
+        | when_kw | do_kw | cond_kw | switch_kw | for_kw | while_kw | break_kw
+        | continue_kw | enum_kw | struct_kw | method_kw | self_kw | macro_kw
+        | try_kw | throw_kw | catch_kw | finally_kw | typedef_kw | import_kw
+        | export_kw
+        | slice | nil | bool | c64 | f64 | i64
+        | type_annotation | auto_gensym | and | module | member
         | symbol | keyword | regex | string
         | list | vector | map | set | array
         | quote | syntax_quote | unquote_splicing | unquote |  splicing }

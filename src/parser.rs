@@ -7,7 +7,6 @@ use pest_derive::Parser;
 
 use crate::structures::ast;
 use crate::structures::Result;
-use crate::structures::green::{GreenNode, GreenNodeData, GreenElement, GreenTreeBuilder};
 use crate::structures::errors::Error::*;
 
 #[derive(Parser)]
@@ -23,7 +22,6 @@ pub fn parse(code: &str) -> Result<ast::AST> {
         spans: Vec::new(),
         errors: Vec::new(),
     };
-    ast.builder.start_node();
 
     pairs_to_ast(pairs, &mut ast);
     Ok(ast)
@@ -31,15 +29,16 @@ pub fn parse(code: &str) -> Result<ast::AST> {
 
 fn pest_parse_to_pairs(code: &str) -> Result<Pairs<Rule>> {
     let toplevel = Parser::parse(Rule::scilisp, code);
+    println!("{:?}", toplevel);
     let inners = match toplevel {
         Ok(mut pairs) => pairs.next().unwrap().into_inner().next().unwrap().into_inner(),
         Err(err) => Err(ParseError(Box::new(err)))?,
     };
+    println!("{:?}", inners);
     Ok(inners)
 }
 
 fn pairs_to_ast(pairs: Pairs<Rule>, ast: &mut ast::AST) {
-    let mut ast =
     for pair in pairs {
         match pair.as_rule() {
             Rule::string => (),
@@ -299,5 +298,210 @@ mod tests {
             }
         }
     }
-    // TODO: type_annotation, dot, slash, and, quote, syntax_quote, unquote, unquote_splicing, splicing
+
+    #[test]
+    fn test_pest_parse_11_slice() {
+        let code = r##"
+        |
+        -1|
+        |-1
+        -1|-1
+        ||
+        -1||
+        |-1|
+        ||-1
+        -1|-1|
+        |-1|-1
+        -1||-1
+        -1|-1|-1
+        a|b|c
+        (+)|(+)|(+)
+        "##;
+        for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
+            match pairs.as_rule() {
+                Rule::slice => (),
+                _ => panic!("{0}\n => {1}", code, i)
+            }
+        }
+    }
+
+    #[test]
+    fn test_pest_parse_12_special_forms() {
+        let code = r##"
+        (def)
+        (const)
+        (let)
+        (set!)
+        (defn)
+        (return)
+        (fn)
+        (when)
+        (do)
+        (cond)
+        (switch)
+        (for)
+        (while)
+        (break)
+        (continue)
+        (enum)
+        (struct)
+        (method)
+        (self)
+        (macro)
+        (try)
+        (throw)
+        (catch)
+        (finally)
+        (typedef)
+        (import)
+        (export)
+        "##;
+        for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
+            let sym = match pairs.as_rule() {
+                Rule::list => pairs.into_inner().next().unwrap().as_rule(),
+                _ => panic!("{0}\n => {1}", code, i)
+            };
+
+            match sym {
+                Rule::def_kw => (),
+                Rule::const_kw => (),
+                Rule::let_kw => (),
+                Rule::sete_kw => (),
+                Rule::defn_kw => (),
+                Rule::return_kw => (),
+                Rule::fn_kw => (),
+                Rule::when_kw => (),
+                Rule::do_kw => (),
+                Rule::cond_kw => (),
+                Rule::switch_kw => (),
+                Rule::for_kw => (),
+                Rule::while_kw => (),
+                Rule::break_kw => (),
+                Rule::continue_kw => (),
+                Rule::enum_kw => (),
+                Rule::struct_kw => (),
+                Rule::method_kw => (),
+                Rule::self_kw => (),
+                Rule::macro_kw => (),
+                Rule::try_kw => (),
+                Rule::throw_kw => (),
+                Rule::catch_kw => (),
+                Rule::finally_kw => (),
+                Rule::typedef_kw => (),
+                Rule::import_kw => (),
+                Rule::export_kw => (),
+                _ => panic!("{0}\n => {1}", code, i)
+            }
+        }
+    }
+
+    #[test]
+    fn test_pest_parse_13_reader_macros() {
+        let code = r##"
+        '(+)
+        `(+)
+        ~(+)
+        ~@(+)
+        @(+)
+        "##;
+        for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
+            match pairs.as_rule() {
+                Rule::quote => (),
+                Rule::syntax_quote => (),
+                Rule::unquote => (),
+                Rule::unquote_splicing => (),
+                Rule::splicing => (),
+                _ => panic!("{0}\n => {1}", code, i)
+            }
+        }
+    }
+
+    #[test]
+    fn test_pest_parse_14_type_annotation() {
+        let code = r##"
+        #i64
+        #bool
+        #l[#any]
+        #a[#i64, [2, 3, 4]]
+        #macro
+        #generator[#str]
+        "##;
+        for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
+            match pairs.as_rule() {
+                Rule::type_annotation => (),
+                _ => panic!("{0}\n => {1}", code, i)
+            }
+        }
+    }
+
+    #[test]
+    fn test_pest_parse_15_auto_gensym() {
+        let code = r##"
+        hoge#
+        "##;
+        for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
+            match pairs.as_rule() {
+                Rule::auto_gensym => (),
+                _ => panic!("{0}\n => {1}", code, i)
+            }
+        }
+    }
+
+
+    #[test]
+    fn test_pest_parse_16_and() {
+        let code = r##"
+        [arg1, arg2, & rest & {:key1 val1, :key2 val2}]
+        "##;
+        for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
+            let v = match pairs.as_rule() {
+                Rule::vector => pairs.into_inner().next().unwrap().as_rule(),
+                _ => panic!("{0}\n => {1}", code, i)
+            };
+            match v {
+                Rule::symbol => (),
+                Rule::and => (),
+                Rule::map => (),
+                _ => panic!("{0}\n => {1}", code, i)
+            }
+        }
+    }
+
+    #[test]
+    fn test_pest_parse_17_module() {
+        let code = r##"
+        (mod1/func1)
+        (mod2/inner2/func2)
+        "##;
+        for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
+            let v = match pairs.as_rule() {
+                Rule::list => pairs.into_inner().next().unwrap().as_rule(),
+                _ => panic!("{0}\n => {1}", code, i)
+            };
+            match v {
+                Rule::module => (),
+                _ => panic!("{0}\n => {1}", code, i)
+            }
+        }
+    }
+
+    #[test]
+    fn test_pest_parse_18_member() {
+        let code = r##"
+        (a.b)
+        (.b a)
+        (a.b.c)
+        "##;
+        for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
+            let v = match pairs.as_rule() {
+                Rule::list => pairs.into_inner().next().unwrap().as_rule(),
+                _ => panic!("{0}\n => {1}", code, i)
+            };
+            match v {
+                Rule::member => (),
+                Rule::symbol => (),
+                _ => panic!("{0}\n => {1}", code, i)
+            }
+        }
+    }
 }
