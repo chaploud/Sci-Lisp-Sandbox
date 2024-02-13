@@ -349,10 +349,13 @@ mod tests {
         #a[#i64, [2, 3, 4]]
         #macro
         #generator[#str]
+        #fn[#i64, #i64] => #i64
         "##;
         for (i, pairs) in pest_parse_to_pairs(code).unwrap().enumerate() {
             match pairs.as_rule() {
                 Rule::type_annotation => (),
+                Rule::vector => (),
+                Rule::right_arrow => (),
                 _ => panic!("{0}\n => {1}", code, i)
             }
         }

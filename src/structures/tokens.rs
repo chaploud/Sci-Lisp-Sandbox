@@ -59,6 +59,7 @@ pub enum TokenKind {
     SPLICING,
     // Type Annotation
     TYPE_ANNOTATION,
+    RIGHT_ARROW,
     // Auto GenSym
     AUTO_GENSYM,
     // Semantic
