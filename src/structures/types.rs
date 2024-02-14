@@ -15,39 +15,21 @@ pub type Set<T> = indexmap::IndexSet<T>;
 pub type Array<T, D> = ndarray::Array<T, D>;
 pub type Datetime = chrono::DateTime<chrono::Utc>;
 pub type Duraton = chrono::Duration;
-pub type OptionType<T> = Option<T>;
 
 #[derive(Clone, Debug)]
 pub struct Keyword {
-    pub id: NodeId,
     pub name: Str,
 }
 
+#[derive(Clone, Debug)]
 pub struct Symbol {
-    pub span: Span,
     pub name: Str,
 }
 
+#[derive(Clone, Debug)]
 pub struct Type {
     pub name: Str,
-    pub generics: List<Type>,
-}
-
-pub struct Macro {
-    pub name: Str,
-    pub body: Str,
-}
-
-pub struct Function {
-    pub name: Str,
-    pub args: List<Symbol>,
-    pub body: Str,
-}
-
-pub struct Generator<T> {
-    pub name: Str,
-    pub args: List<T>,
-    pub body: Str,
+    pub generics: Option<List<Type>>,
 }
 
 pub trait Iterable<T> {
@@ -59,8 +41,4 @@ pub trait Collection<T> {
     fn len(&self) -> usize;
 }
 
-pub enum MapKey {
-    Keyword(Keyword),
-    Str(Str),
-    I64(I64),
-}
+// Function, Macro

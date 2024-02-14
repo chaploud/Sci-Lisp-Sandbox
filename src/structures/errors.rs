@@ -7,7 +7,7 @@ use codespan_reporting::diagnostic::{Diagnostic, Label};
 use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 
-use crate::structures::objects::Str;
+use crate::structures::types::Str;
 use crate::parser::Rule;
 
 #[derive(Debug)]

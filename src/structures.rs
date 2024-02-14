@@ -1,7 +1,7 @@
 pub mod errors;
 pub mod ast;
 pub mod arena;
-pub mod objects;
+pub mod types;
 pub mod definitions;
 pub mod span;
 pub mod tokens;
