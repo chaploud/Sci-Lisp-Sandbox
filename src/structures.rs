@@ -5,6 +5,7 @@ pub mod types;
 pub mod definitions;
 pub mod span;
 pub mod tokens;
+pub mod objects;
 
 use errors::Error;
 

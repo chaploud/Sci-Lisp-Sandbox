@@ -20,14 +20,6 @@ pub struct Parser;
 
 pub fn parse(code: &str) -> Result<ast::AST> {
     let pairs = pest_parse_to_pairs(code)?;
-
-    let mut ast = ast::AST {
-        next_node_id: 0,
-        nodes: Vec::new(),
-        spans: Vec::new(),
-        errors: Vec::new(),
-    };
-
-    pairs_to_ast(pairs);
+    let ast = pairs_to_ast(pairs);
     Ok(ast)
 }

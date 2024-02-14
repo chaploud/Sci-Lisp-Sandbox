@@ -13,7 +13,6 @@ use crate::parser::Rule;
 
 pub fn pest_parse_to_pairs(code: &str) -> Result<Pairs<Rule>> {
     let toplevel = Parser::parse(Rule::scilisp, code);
-    println!("{:?}", toplevel);
     let inners = match toplevel {
         Ok(mut pairs) => pairs.next().unwrap().into_inner().next().unwrap().into_inner(),
         Err(err) => Err(ParseError(Box::new(err)))?,
