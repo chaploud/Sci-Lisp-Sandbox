@@ -18,8 +18,8 @@ mod pairs2ast;
 #[grammar = "parser/grammar.pest"]
 pub struct Parser;
 
-pub fn parse(code: &str) -> Result<ast::AST> {
+pub fn parse(code: &str) -> Result<()> {
     let pairs = pest_parse_to_pairs(code)?;
     let ast = pairs_to_ast(pairs);
-    Ok(ast)
+    Ok(())
 }

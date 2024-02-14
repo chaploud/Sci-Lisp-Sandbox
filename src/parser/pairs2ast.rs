@@ -8,7 +8,7 @@ use crate::structures::tokens::TokenKind::*;
 pub fn pairs_to_ast(pairs: Pairs<Rule>) {
     for pair in pairs {
         match pair.as_rule() {
-            Rule::string => ,
+            Rule::string => (),
             Rule::regex => (),
             Rule::i64 => (),
             Rule::f64 => (),
