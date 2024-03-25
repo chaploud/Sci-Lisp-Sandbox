@@ -208,3 +208,14 @@ Sema構造体内のArenaからデータをidで高速に取り出すことがで
 - doraを読んで、全体像を掴んで置く必要がある
 
 ### doraリーディングメモ
+
+- コマンドライン引数処理
+- `compile_into_program`
+  - `Sema::new()`
+  - 色んなものの `Arena::new()`
+    - `id-arena` クレート
+  - `check_program`
+    - `parser::parse()`
+      - `prepare_packages()`
+      - `add_all_packages()`
+      - `parse_file()`
