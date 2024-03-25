@@ -22,7 +22,7 @@ inf                 ; f64: positive infinity
 ;; falsy value is only 'false' and 'nil'
 ;; "", '(), [], {}, #{}, 0, nan => all truthy"
 
-;; Sci-Lisp is Lisp-2 (function and variable has different namespace)
+;; Sci-Lisp is Lisp-1 (function and variable has different namespace)
 
 ;; ===== Keywords (cannot use as symbol name)
 ;; false, true, nil,
